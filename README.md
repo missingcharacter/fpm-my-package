@@ -2,6 +2,14 @@
 
 Note: Quick and dirty script
 
+## Dependencies
+
+- git
+- curl
+- docker
+- [parallel](https://www.gnu.org/software/parallel/)
+  - MacOS: `parallel` can be installed via `brew`
+
 ## Run it like this
 
 ```
