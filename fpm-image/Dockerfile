@@ -1,9 +1,3 @@
-#
-# FPM Dockerfile
-#
-# https://github.com/dockerfile/fpm
-#
-
 # Pull base image.
 FROM ruby:2.6.3-stretch
 
