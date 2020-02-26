@@ -1,26 +1,28 @@
 #!/usr/bin/env bash
 # Enable bash's unofficial strict mode
-export GITROOT=$(git rev-parse --show-toplevel)
-. ${GITROOT}/lib/strict-mode
+GITROOT=$(git rev-parse --show-toplevel)
+export GITROOT
+. "${GITROOT}/lib/strict-mode"
 strictMode
 
-THIS_SCRIPT=$(basename $0)
+THIS_SCRIPT=$(basename "${0}")
 PADDING=$(printf %-${#THIS_SCRIPT}s " ")
 # Make these variables available to 'parallel'
-export FPM_TAG='fpm-my-package:0.0.1'
+export FPM_TAG='fpm-my-package:0.0.2'
 export PACKAGES_DIR='packages/'
-export PACKAGES=$(ls ${PACKAGES_DIR})
+PACKAGES=$(ls ${PACKAGES_DIR})
+export PACKAGES
 
-msg_info () {
-  local GREEN='\033[0;32m'
-  local NC='\033[0m' # No Color
-  printf "${GREEN}${@}${NC}\n"
+function msg_info () {
+  local GREEN=$'\033[0;32m'
+  local NC=$'\033[0m' # No Color
+  printf "%s\n" "${GREEN}${*}${NC}"
 }
 
-msg_error () {
-  local LRED='\033[01;31m'
-  local NC='\033[0m' # No Color
-  printf "${LRED}${@}${NC}\n"
+function msg_error () {
+  local LRED=$'\033[01;31m'
+  local NC=$'\033[0m' # No Color
+  printf "%s\n" "${LRED}${*}${NC}"
 }
 
 # Make message functions available to 'parallel'
@@ -28,27 +30,18 @@ export -f msg_info
 export -f msg_error
 
 # Ensure dependencies are present
-if [[ ! -x $(which git) || ! -x $(which curl) || ! -x $(which docker) || ! -x $(which parallel) ]] ; then
+if [[ ! -x $(command -v git) || ! -x $(command -v curl) || ! -x $(command -v docker) || ! -x $(command -v parallel) ]] ; then
     msg_error "[-] Dependencies unmet.  Please verify that the following are installed and in the PATH:  git, curl, docker, parallel" >&2
     msg_error "[-] For more on 'parallel' go to: https://www.gnu.org/software/parallel/" >&2
     exit 1
 fi
 
-cleanup () {
-  parallel -j+0 --eta 'msg_info "Deleting {1} directory and compressed file"; rm -rf "{1}_DOWN"; rm -rf {1}' ::: ${PACKAGES[@]}
+function cleanup () {
+  parallel -j+0 --eta 'msg_info "Deleting {1} directory and compressed file"; rm -rf "{1}_DOWN"; rm -rf {1}' ::: "${PACKAGES[@]}"
 }
 
-cleanup_untar () {
-  local NAME=${1}
-  echo "Moving binary to current working directory"
-  mv ${NAME}*/${NAME} .
-  echo "Removing empty directory"
-  rmdir ${NAME}*/
-}
-
-# Make cleanup functions available to 'parallel'
+# Make cleanup function available to 'parallel'
 export -f cleanup
-export -f cleanup_untar
 
 # Make sure cleanup runs even if this script fails
 trap cleanup EXIT
@@ -56,17 +49,17 @@ trap cleanup EXIT
 msg_info "Building fpm docker image"
 
 cd fpm-image
-docker build -f Dockerfile -t ${FPM_TAG} .
+docker build -f Dockerfile -t "${FPM_TAG}" .
 cd -
 
-download_and_build () {
+function download_and_build () {
   # Enable bash's unofficial strict mode
-  . ${GITROOT}/lib/strict-mode
+  . "${GITROOT}"/lib/strict-mode
   strictMode
 
   local PACKAGE_FILE=${1}
 
-  for i in $(cat ${PACKAGES_DIR}${PACKAGE_FILE}); do
+  for i in $(cat "${PACKAGES_DIR}${PACKAGE_FILE}"); do
     local "${i}"
   done
 
@@ -94,21 +87,21 @@ download_and_build () {
 
   msg_info "Downloading ${NAME} version ${VERSION}"
 
-  curl -L ${SOURCE//\'/} -o ${DOWNLOADED_FILE}
+  curl -L "${SOURCE//\'/}" -o "${DOWNLOADED_FILE}"
+
+  mkdir "${NAME}"
 
   msg_info "Extracting ${NAME} version ${VERSION}"
 
-  case "$(file ${DOWNLOADED_FILE})" in
+  case "$(file "${DOWNLOADED_FILE}")" in
     ${DOWNLOADED_FILE}:\ gzip\ compressed\ data*)
-    tar -xzvf ${DOWNLOADED_FILE}
-    cleanup_untar ${NAME}
+    tar -xzvf "${DOWNLOADED_FILE}" -C "${NAME}"
     ;;
     ${DOWNLOADED_FILE}:\ POSIX\ tar\ archive*)
-    tar -xzvf ${DOWNLOADED_FILE}
-    cleanup_untar ${NAME}
+    tar -xzvf "${DOWNLOADED_FILE}" -C "${NAME}"
     ;;
     ${DOWNLOADED_FILE}:\ Zip\ archive\ data*)
-    unzip ${DOWNLOADED_FILE}
+    unzip "${DOWNLOADED_FILE}" -d "${NAME}"
     ;;
     *)
     msg_error "Unknown file type: $(uname)" >&2
@@ -119,16 +112,21 @@ download_and_build () {
 
   msg_info "Building ${NAME} version ${VERSION}"
 
-  FPM_OPTS="build-packages.sh -n ${NAME} -v ${VERSION} -r ${RELEASE} -s ${SOURCE} -c ${VENDOR} -l ${LICENSE} ${DEP_OPTS} -m ${MAINTAINER} -d ${DESCRIPTION}"
+  if [[ ! -z "${OVERRIDE+x}" ]]; then
+    local FPM_OPTS="${OVERRIDE//\'/}"
+  else
+    local FPM_OPTS="build-packages.sh -n ${NAME} -v ${VERSION} -r ${RELEASE} -s ${SOURCE} -c ${VENDOR} -l ${LICENSE} ${DEP_OPTS} -m ${MAINTAINER} -d ${DESCRIPTION}"
+  fi
 
   msg_info "FPM_OPTS are: ${FPM_OPTS}"
 
-  docker run --rm -v ${PWD}:/data ${FPM_TAG} -c "${FPM_OPTS}"
+
+  docker run --rm -v "${PWD}":/data ${FPM_TAG} -c "${FPM_OPTS}"
 }
 
 # Make download_and_build function available to 'parallel'
 export -f download_and_build
 
-parallel -j+0 --eta 'download_and_build {}' ::: ${PACKAGES[@]}
+parallel -j+0 --eta 'download_and_build {}' ::: "${PACKAGES[@]}"
 
 cleanup

@@ -1,4 +1,4 @@
-# Build RPMs/DEBs from a single binary
+# Build RPMs/DEBs using Effing Package Manager
 
 Note: Quick and dirty script
 

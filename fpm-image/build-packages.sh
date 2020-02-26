@@ -29,25 +29,25 @@ fi
 while getopts ":n:v:r:s:c:m:l:d:a:b:" opt; do
   case ${opt} in
     n)
-      NAME=${OPTARG} ;;
+      export NAME=${OPTARG} ;;
     v)
-      VERSION=${OPTARG} ;;
+      export VERSION=${OPTARG} ;;
     r)
-      RELEASE=${OPTARG} ;;
+      export RELEASE=${OPTARG} ;;
     s)
-      SOURCE=${OPTARG} ;;
+      export SOURCE=${OPTARG} ;;
     c)
-      VENDOR=${OPTARG} ;;
+      export VENDOR=${OPTARG} ;;
     m)
-      MAINTAINER=${OPTARG} ;;
+      export MAINTAINER=${OPTARG} ;;
     l)
-      LICENSE=${OPTARG} ;;
+      export LICENSE=${OPTARG} ;;
     d)
-      DESCRIPTION=${OPTARG} ;;
+      export DESCRIPTION=${OPTARG} ;;
     a)
-      RPM_DEPENDENCIES=${OPTARG} ;;
+      export RPM_DEPENDENCIES=${OPTARG} ;;
     b)
-      DEB_DEPENDENCIES=${OPTARG} ;;
+      export DEB_DEPENDENCIES=${OPTARG} ;;
     \?)
       usage ;;
     :)
@@ -82,29 +82,35 @@ else
   RPM_DEPS=""
 fi
 
-RPM_OPTS="fpm -s dir -t rpm -n ${NAME} -v ${VERSION} --license ${LICENSE} -a native --url ${SOURCE} --prefix '/usr/local/bin' --iteration ${RELEASE} ${RPM_DEPS} -m '${MAINTAINER}' --description '${DESCRIPTION}' ${NAME}"
-DEB_OPTS="fpm -s dir -t deb -n ${NAME} -v ${VERSION} --license ${LICENSE} -a native --url ${SOURCE} --prefix '/usr/local/bin' --deb-no-default-config-files --iteration ${RELEASE} ${DEB_DEPS} -m '${MAINTAINER}' --description '${DESCRIPTION}' ${NAME}"
+CUSTOM_SCRIPT="/data/custom/${NAME}"
 
-msg_info "Creating RPM"
+if [[ -f "${CUSTOM_SCRIPT}" ]]; then
+    bash "${CUSTOM_SCRIPT}"
+else
+  RPM_OPTS="fpm -s dir -t rpm -n ${NAME} -v ${VERSION} --license ${LICENSE} -a native --url ${SOURCE} --prefix '/usr/local/bin' --iteration ${RELEASE} ${RPM_DEPS} -m '${MAINTAINER}' --description '${DESCRIPTION}' -C ./${NAME}"
+  DEB_OPTS="fpm -s dir -t deb -n ${NAME} -v ${VERSION} --license ${LICENSE} -a native --url ${SOURCE} --prefix '/usr/local/bin' --deb-no-default-config-files --iteration ${RELEASE} ${DEB_DEPS} -m '${MAINTAINER}' --description '${DESCRIPTION}' -C ./${NAME}"
 
-echo "fpm options for RPM are: ${RPM_OPTS}"
+  msg_info "Creating RPM"
 
-eval "${RPM_OPTS}"
+  echo "fpm options for RPM are: ${RPM_OPTS}"
 
-rpm -qpi "${NAME}-${VERSION}-${RELEASE}.x86_64.rpm"
+  eval "${RPM_OPTS}"
 
-msg_info "Moving RPM to built-packages/RPM/"
+  rpm -qpi "${NAME}-${VERSION}-${RELEASE}.x86_64.rpm"
 
-mv "${NAME}-${VERSION}-${RELEASE}.x86_64.rpm" built-packages/RPM/
+  msg_info "Moving RPM to built-packages/RPM/"
 
-msg_info "Creating DEB"
+  mv "${NAME}-${VERSION}-${RELEASE}.x86_64.rpm" built-packages/RPM/
 
-echo "fpm options for DEB are: ${DEB_OPTS}"
+  msg_info "Creating DEB"
 
-eval "${DEB_OPTS}"
+  echo "fpm options for DEB are: ${DEB_OPTS}"
 
-dpkg-deb -I "${NAME}_${VERSION}-${RELEASE}_amd64.deb"
+  eval "${DEB_OPTS}"
 
-msg_info "Moving DEB to built-packages/DEB/"
+  dpkg-deb -I "${NAME}_${VERSION}-${RELEASE}_amd64.deb"
 
-mv "${NAME}_${VERSION}-${RELEASE}_amd64.deb" built-packages/DEB/
+  msg_info "Moving DEB to built-packages/DEB/"
+
+  mv "${NAME}_${VERSION}-${RELEASE}_amd64.deb" built-packages/DEB/
+fi
