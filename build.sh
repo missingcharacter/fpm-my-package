@@ -4,30 +4,18 @@ GITROOT=$(git rev-parse --show-toplevel)
 export GITROOT
 . "${GITROOT}/lib/strict-mode"
 strictMode
+. "${GITROOT}/lib/utils"
 
-THIS_SCRIPT=$(basename "${0}")
-PADDING=$(printf %-${#THIS_SCRIPT}s " ")
+# Make message functions available to 'parallel'
+export -f msg_info
+export -f msg_error
+export -f strictMode
+
 # Make these variables available to 'parallel'
 export FPM_TAG='fpm-my-package:0.0.2'
 export PACKAGES_DIR='packages/'
 PACKAGES=$(ls ${PACKAGES_DIR})
 export PACKAGES
-
-function msg_info () {
-  local GREEN=$'\033[0;32m'
-  local NC=$'\033[0m' # No Color
-  printf "%s\n" "${GREEN}${*}${NC}"
-}
-
-function msg_error () {
-  local LRED=$'\033[01;31m'
-  local NC=$'\033[0m' # No Color
-  printf "%s\n" "${LRED}${*}${NC}"
-}
-
-# Make message functions available to 'parallel'
-export -f msg_info
-export -f msg_error
 
 # Ensure dependencies are present
 if [[ ! -x $(command -v git) || ! -x $(command -v curl) || ! -x $(command -v docker) || ! -x $(command -v parallel) ]] ; then
@@ -54,7 +42,6 @@ cd -
 
 function download_and_build () {
   # Enable bash's unofficial strict mode
-  . "${GITROOT}"/lib/strict-mode
   strictMode
 
   local PACKAGE_FILE=${1}

@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Enable bash's unofficial strict mode
+GITROOT=$(git rev-parse --show-toplevel)
+export GITROOT
+. "${GITROOT}/lib/strict-mode"
+strictMode
+
+function msg_info () {
+  local GREEN=$'\033[0;32m'
+  local NC=$'\033[0m' # No Color
+  printf "%s\n" "${GREEN}${*}${NC}"
+}
+
+function msg_error () {
+  local LRED=$'\033[01;31m'
+  local NC=$'\033[0m' # No Color
+  printf "%s\n" "${LRED}${*}${NC}"
+}
+
+function gettoken() {
+  local TOKEN_TO_LOOKUP="${1}"
+  local FILE_WITH_TOKENS="${2:-"${HOME}/.tokens"}"
+  local SEPARATOR='='
+  grep "^${TOKEN_TO_LOOKUP}" ${FILE_WITH_TOKENS} | cut -d ${SEPARATOR} -f2
+}
