@@ -35,6 +35,9 @@ function upload_package () {
   local PACKAGE_VERSION="$(gettoken VERSION ${PACKAGE_INFO})"
   PACKAGE_VERSION="${PACKAGE_VERSION//\'/}"
   local DEB_ARCH="$(echo ${FILENAME} | cut -d '_' -f3)"
+  # Source: https://www.jfrog.com/confluence/display/JFROG/Debian+Repositories
+  # Source: https://www.jfrog.com/confluence/display/BT/Bintray+REST+API
+  if [[ "${DEB_ARCH}" == 'noarch' ]]; then DEB_ARCH='all'; fi
   local DEB_DISTROS='buster,bionic,eoan,focal'
   local DEB_COMPONENT='stable'
   local BINTRAY_BASE_URL='https://api.bintray.com/content'
@@ -42,7 +45,7 @@ function upload_package () {
   local BINTRAY_USER='missingcharacter'
   local HTTP_AUTH="${BINTRAY_USER}:${BINTRAY_API_KEY}"
   local BINTRAY_REPO='fpm-my-package'
-  local UPLOAD_URL="${BINTRAY_BASE_URL}/${BINTRAY_USER}/${BINTRAY_REPO}/${PACKAGE_NAME}/${PACKAGE_VERSION}/pool/${PACKAGE_NAME}/${PACKAGE};deb_distribution=${DEB_DISTROS};deb_component=stable;deb_architecture=${DEB_ARCH}"
+  local UPLOAD_URL="${BINTRAY_BASE_URL}/${BINTRAY_USER}/${BINTRAY_REPO}/${PACKAGE_NAME}/${PACKAGE_VERSION}/pool/${PACKAGE_NAME}/${PACKAGE};deb_distribution=${DEB_DISTROS};deb_component=stable;deb_architecture=${DEB_ARCH};publish=1;override=1"
 
   curl -T "${PATH_TO_PACKAGE}" -u"${HTTP_AUTH}" "${UPLOAD_URL}"
 }
