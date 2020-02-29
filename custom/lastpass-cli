@@ -44,7 +44,6 @@ for i in $(echo "${RPM_DEPENDENCIES}"); do
 done
 IFS=$'\n\t'
 
-
 msg_info "Creating RPM"
 
 RPM_OPTS="fpm -s dir -t rpm -n '${NAME}' -v '${VERSION}' --license '${LICENSE}' -a native --url '${SOURCE}' --iteration '${RELEASE}' ${RPM_DEPS} -m '${MAINTAINER}' --description '${DESCRIPTION}' /opt/usr/=/usr/local"

@@ -99,11 +99,7 @@ function download_and_build () {
 
   msg_info "Building ${NAME} version ${VERSION}"
 
-  if [[ ! -z "${OVERRIDE+x}" ]]; then
-    local FPM_OPTS="${OVERRIDE//\'/}"
-  else
-    local FPM_OPTS="build-packages.sh -n ${NAME} -v ${VERSION} -r ${RELEASE} -s ${SOURCE} -c ${VENDOR} -l ${LICENSE} ${DEP_OPTS} -m ${MAINTAINER} -d ${DESCRIPTION}"
-  fi
+  local FPM_OPTS="build-packages.sh -n ${NAME} -v ${VERSION} -r ${RELEASE} -s ${SOURCE} -c ${VENDOR} -l ${LICENSE} ${DEP_OPTS} -m ${MAINTAINER} -d ${DESCRIPTION}"
 
   msg_info "FPM_OPTS are: ${FPM_OPTS}"
 
