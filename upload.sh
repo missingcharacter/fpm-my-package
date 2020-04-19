@@ -13,8 +13,8 @@ export -f strictMode
 export -f gettoken
 
 # Ensure dependencies are present
-if [[ ! -x $(command -v git) || ! -x $(command -v curl) || ! -x $(command -v parallel) ]] ; then
-    msg_error "[-] Dependencies unmet.  Please verify that the following are installed and in the PATH:  git, curl, docker, parallel" >&2
+if [[ ! -x $(command -v git) || ! -x $(command -v curl) || ! -x $(command -v parallel) || ! -x $(command -v keyring) ]] ; then
+    msg_error "[-] Dependencies unmet.  Please verify that the following are installed and in the PATH:  git, curl, docker, parallel, keyring" >&2
     msg_error "[-] For more on 'parallel' go to: https://www.gnu.org/software/parallel/" >&2
     exit 1
 fi
@@ -41,7 +41,7 @@ function upload_package () {
   local DEB_DISTROS='buster,bionic,eoan,focal'
   local DEB_COMPONENT='stable'
   local BINTRAY_BASE_URL='https://api.bintray.com/content'
-  local BINTRAY_API_KEY="$(gettoken BINTRAY_API_KEY)"
+  local BINTRAY_API_KEY="$(keyring get bintray BINTRAY_API_KEY)"
   local BINTRAY_USER='missingcharacter'
   local HTTP_AUTH="${BINTRAY_USER}:${BINTRAY_API_KEY}"
   local BINTRAY_REPO='fpm-my-package'
