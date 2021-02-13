@@ -5,16 +5,26 @@ export GITROOT
 . "${GITROOT}/lib/strict-mode"
 strictMode
 
+
+ANSI_NO_COLOR=$'\033[0m'
 function msg_info () {
   local GREEN=$'\033[0;32m'
-  local NC=$'\033[0m' # No Color
-  printf "%s\n" "${GREEN}${*}${NC}"
+  printf "%s\n" "${GREEN}${*}${ANSI_NO_COLOR}"
+}
+
+function msg_warn () {
+  local YELLOW=$'\033[0;33m'
+  printf "%s\n" "${YELLOW}${*}${ANSI_NO_COLOR}"
 }
 
 function msg_error () {
   local LRED=$'\033[01;31m'
-  local NC=$'\033[0m' # No Color
-  printf "%s\n" "${LRED}${*}${NC}"
+  printf "%s\n" "${LRED}${*}${ANSI_NO_COLOR}"
+}
+
+function msg_fatal () {
+  local RED=$'\033[0;31m'
+  printf "%s\n" "${RED}${*}${ANSI_NO_COLOR}"
 }
 
 function gettoken() {

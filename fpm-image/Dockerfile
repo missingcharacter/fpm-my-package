@@ -1,5 +1,7 @@
 # Pull base image.
-FROM ruby:2.7.0-buster
+FROM ruby:3.0.0-buster
+
+ENV FPM_VERSION=1.12.0
 
 COPY build-packages.sh /usr/local/bin/build-packages.sh
 
@@ -7,8 +9,8 @@ COPY build-packages.sh /usr/local/bin/build-packages.sh
 RUN echo "===> Making /usr/local/bin/build-packages.sh executable ..." \
   && export DEBIAN_FRONTEND='noninteractive' \
   && chmod +x /usr/local/bin/build-packages.sh \
-  && echo "===> Installing fpm version 1.11.0 ..." \
-  && gem install fpm -v '1.11.0' \
+  && echo "===> Installing fpm version ${FPM_VERSION} ..." \
+  && gem install fpm -v "${FPM_VERSION}" \
   && echo "===> Checking for updates..." \
   && apt update \
   && apt install rpm fakeroot asciidoc xsltproc bash-completion build-essential cmake libcurl4 libcurl4-openssl-dev libssl-dev libxml2 libxml2-dev libssl1.1 pkg-config ca-certificates xclip -y \

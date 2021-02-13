@@ -7,6 +7,7 @@ strictMode
 . "${GITROOT}/lib/utils"
 
 # Make message functions available to 'parallel'
+export ANSI_NO_COLOR
 export -f msg_info
 export -f msg_error
 export -f strictMode
