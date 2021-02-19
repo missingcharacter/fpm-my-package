@@ -8,9 +8,11 @@ strictMode
 
 # Make message functions available to 'parallel'
 export ANSI_NO_COLOR
+export GITROOT
 export -f msg_info
 export -f msg_error
 export -f strictMode
+export -f strictModeFail
 
 # Make these variables available to 'parallel'
 export FPM_TAG='fpm-my-package:0.0.2'
@@ -104,8 +106,7 @@ function download_and_build () {
 
   msg_info "FPM_OPTS are: ${FPM_OPTS}"
 
-
-  docker run --rm -v "${PWD}":/data ${FPM_TAG} -c "${FPM_OPTS}"
+  docker run --rm -v "${GITROOT}":/data ${FPM_TAG} -c "${FPM_OPTS}"
 }
 
 # Make download_and_build function available to 'parallel'
