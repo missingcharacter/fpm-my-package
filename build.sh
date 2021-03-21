@@ -2,13 +2,14 @@
 # Enable bash's unofficial strict mode
 GITROOT=$(git rev-parse --show-toplevel)
 export GITROOT
+# shellcheck source=./build.sh
 . "${GITROOT}/lib/strict-mode"
 strictMode
+# shellcheck source=./build.sh
 . "${GITROOT}/lib/utils"
 
 # Make message functions available to 'parallel'
 export ANSI_NO_COLOR
-export GITROOT
 export -f msg_info
 export -f msg_error
 export -f strictMode
@@ -39,9 +40,9 @@ trap cleanup EXIT
 
 msg_info "Building fpm docker image"
 
-cd fpm-image
+cd fpm-image || exit 1
 docker build -f Dockerfile -t "${FPM_TAG}" .
-cd -
+cd - || exit 1
 
 function download_and_build () {
   # Enable bash's unofficial strict mode
@@ -101,11 +102,9 @@ function download_and_build () {
   esac
 
   msg_info "Building ${NAME} version ${VERSION}"
-
   local FPM_OPTS="build-packages.sh -n ${NAME} -v ${VERSION} -r ${RELEASE} -s ${SOURCE} -c ${VENDOR} -l ${LICENSE} ${DEP_OPTS} -m ${MAINTAINER} -d ${DESCRIPTION}"
 
   msg_info "FPM_OPTS are: ${FPM_OPTS}"
-
   docker run --rm -v "${GITROOT}":/data ${FPM_TAG} -c "${FPM_OPTS}"
 }
 
