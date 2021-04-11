@@ -15,18 +15,18 @@ function usage () {
 }
 
 ANSI_NO_COLOR=$'\033[0m'
-function msg_info () {
+function msg_info() {
   local GREEN=$'\033[0;32m'
   printf "%s\n" "${GREEN}${*}${ANSI_NO_COLOR}"
 }
 
-function string2array () {
+function string2array() {
   local STRING="${1}"
   local SEPARATOR="${2:-,}"
   tr "${SEPARATOR}" '\n' <<< "${STRING}"
 }
 
-function deps2args(){
+function deps2args() {
   local DEPS=( ${@} )
   local DEPS_AS_STRING=""
   for i in "${DEPS[@]}"; do
