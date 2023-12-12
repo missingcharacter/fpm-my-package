@@ -1,5 +1,5 @@
 # Pull base image.
-FROM ruby:3.2.2-buster
+FROM ruby:3.2.2-buster@sha256:8401591f18ed4cb38e2ce73fe9f655e17c3386306851e2569f0102a05dc5aab2
 
 COPY build-packages.sh /usr/local/bin/build-packages.sh
 
