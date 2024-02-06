@@ -2,10 +2,13 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-THIS_SCRIPT=$(basename $0)
+# shellcheck source=/dev/null
+. "${HOME}/.asdf/asdf.sh"
+
+THIS_SCRIPT=$(basename "${0}")
 PADDING=$(printf %-${#THIS_SCRIPT}s " ")
 
-usage () {
+function usage () {
     echo "Usage:"
     echo "${THIS_SCRIPT} -n <Name of package> -v <Version of package> -r <Release of package> -s <Source of package>"
     echo "${PADDING} -c <Creator of package>  -m <Maintainer of package> -l <License of package>"
@@ -14,14 +17,29 @@ usage () {
     exit 1
 }
 
-msg_info () {
-  local GREEN='\033[0;32m'
-  local NC='\033[0m' # No Color
-  printf "${GREEN}${@}${NC}\n"
+ANSI_NO_COLOR=$'\033[0m'
+function msg_info() {
+  local GREEN=$'\033[0;32m'
+  printf "%s\n" "${GREEN}${*}${ANSI_NO_COLOR}"
+}
+
+function string2array() {
+  local STRING="${1}"
+  local SEPARATOR="${2:-,}"
+  tr "${SEPARATOR}" '\n' <<< "${STRING}"
+}
+
+function deps2args() {
+  declare -a DEPS=( "${@}" )
+  local DEPS_AS_STRING=""
+  for i in "${DEPS[@]}"; do
+    DEPS_AS_STRING="${DEPS_AS_STRING}-d '${i}' "
+  done
+  echo "${DEPS_AS_STRING}"
 }
 
 # Ensure dependencies are present
-if [[ ! -x $(which fpm) || ! -x $(which rpm) || ! -x $(which dpkg-deb) ]] ; then
+if [[ ! -x $(command -v fpm) || ! -x $(command -v rpm) || ! -x $(command -v dpkg-deb) ]] ; then
     echo "[-] Dependencies unmet.  Please verify that the following are installed and in the PATH:  fpm, rpm, dpkg-deb" >&2
     exit 1
 fi
@@ -45,9 +63,9 @@ while getopts ":n:v:r:s:c:m:l:d:a:b:" opt; do
     d)
       export DESCRIPTION=${OPTARG} ;;
     a)
-      export RPM_DEPENDENCIES=${OPTARG} ;;
+      mapfile -t RPM_DEPENDENCIES < <(string2array "${OPTARG}") ;;
     b)
-      export DEB_DEPENDENCIES=${OPTARG} ;;
+      mapfile -t DEB_DEPENDENCIES < <(string2array "${OPTARG}") ;;
     \?)
       usage ;;
     :)
@@ -59,23 +77,12 @@ if [[ -z ${NAME:-""} ]] || [[ -z ${VERSION:-""} ]] || [[ -z ${RELEASE:-""} ]] ||
   usage
 fi
 
-if [ ! -z "${DEB_DEPENDENCIES+x}" ] && [ ! -z "${RPM_DEPENDENCIES+x}" ]; then
-  msg_info "Debian dependencies are ${DEB_DEPENDENCIES}"
-  msg_info "RPM dependencies are ${RPM_DEPENDENCIES}"
+if [ -n "${DEB_DEPENDENCIES+x}" ] && [ -n "${RPM_DEPENDENCIES+x}" ]; then
+  msg_info "Debian dependencies are ${DEB_DEPENDENCIES[*]}"
+  msg_info "RPM dependencies are ${RPM_DEPENDENCIES[*]}"
 
-  DEB_DEPS=""
-  IFS=','
-  for i in $(echo "${DEB_DEPENDENCIES}"); do
-    DEB_DEPS="${DEB_DEPS}-d '${i}' "
-  done
-  IFS=$'\n\t'
-
-  RPM_DEPS=""
-  IFS=','
-  for i in $(echo "${RPM_DEPENDENCIES}"); do
-    RPM_DEPS="${RPM_DEPS}-d '${i}' "
-  done
-  IFS=$'\n\t'
+  DEB_DEPS="$(deps2args "${DEB_DEPENDENCIES[*]}")"
+  RPM_DEPS="$(deps2args "${RPM_DEPENDENCIES[*]}")"
 else
   msg_info "No dependencies will be set"
   DEB_DEPS=""
@@ -98,9 +105,9 @@ else
 
   rpm -qpi "${NAME}-${VERSION}-${RELEASE}.x86_64.rpm"
 
-  msg_info "Moving RPM to built-packages/RPM/"
+  msg_info "Moving RPM to tmp-files/RPM/"
 
-  mv "${NAME}-${VERSION}-${RELEASE}.x86_64.rpm" built-packages/RPM/
+  mv "${NAME}-${VERSION}-${RELEASE}.x86_64.rpm" tmp-files/RPM/
 
   msg_info "Creating DEB"
 
@@ -110,7 +117,7 @@ else
 
   dpkg-deb -I "${NAME}_${VERSION}-${RELEASE}_amd64.deb"
 
-  msg_info "Moving DEB to built-packages/DEB/"
+  msg_info "Moving DEB to tmp-files/DEB/"
 
-  mv "${NAME}_${VERSION}-${RELEASE}_amd64.deb" built-packages/DEB/
+  mv "${NAME}_${VERSION}-${RELEASE}_amd64.deb" tmp-files/DEB/
 fi

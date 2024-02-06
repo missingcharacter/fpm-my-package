@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD041 -->
 <!-- Please make sure you check the following points -->
 
 {PR Description goes here}

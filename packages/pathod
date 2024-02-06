@@ -1,8 +1,0 @@
-NAME='pathod'
-VERSION='5.0.1'
-RELEASE='0'
-SOURCE='https://snapshots.mitmproxy.org/5.0.1/pathod-5.0.1-linux.tar.gz'
-VENDOR='Aldo Cortesi'
-MAINTAINER='aldo@corte.si'
-LICENSE='MIT'
-DESCRIPTION='Perverse HTTP client and server applications designed to let you craft almost any conceivable HTTP request, including ones that creatively violate the standards'

@@ -2,6 +2,7 @@
 # Enable bash's unofficial strict mode
 GITROOT=$(git rev-parse --show-toplevel)
 export GITROOT
+# shellcheck disable=SC1091
 . "${GITROOT}/lib/strict-mode"
 strictMode
 
@@ -9,7 +10,7 @@ THIS_SCRIPT=$(basename "${0}")
 
 SRC_DIR="/data/${THIS_SCRIPT}"
 
-cd "${SRC_DIR}"
+cd "${SRC_DIR}" || exit
 
 make
 make install DESTDIR=/opt
@@ -27,19 +28,26 @@ function msg_error () {
   printf "%s\n" "${LRED}${*}${NC}"
 }
 
+function cleanup () {
+  msg_info "Deleting ${SRC_DIR} directory and compressed file"
+  rm -rf "${SRC_DIR}"
+}
+# Make sure cleanup runs even if this script fails
+trap cleanup EXIT
+
 msg_info "Debian dependencies are ${DEB_DEPENDENCIES}"
 msg_info "RPM dependencies are ${RPM_DEPENDENCIES}"
 
 DEB_DEPS=""
 IFS=','
-for i in $(echo "${DEB_DEPENDENCIES}"); do
+for i in echo "${DEB_DEPENDENCIES}"; do
   DEB_DEPS="${DEB_DEPS}-d '${i}' "
 done
 IFS=$'\n\t'
 
 RPM_DEPS=""
 IFS=','
-for i in $(echo "${RPM_DEPENDENCIES}"); do
+for i in echo "${RPM_DEPENDENCIES}"; do
   RPM_DEPS="${RPM_DEPS}-d '${i}' "
 done
 IFS=$'\n\t'
@@ -51,9 +59,9 @@ eval "${RPM_OPTS}"
 
 rpm -qpi "${NAME}-${VERSION}-${RELEASE}.x86_64.rpm"
 
-msg_info "Moving RPM to built-packages/RPM/"
+msg_info "Moving RPM to tmp-files/RPM/"
 
-mv "${NAME}-${VERSION}-${RELEASE}.x86_64.rpm" /data/built-packages/RPM/
+mv "${NAME}-${VERSION}-${RELEASE}.x86_64.rpm" /data/tmp-files/RPM/
 
 msg_info "Creating DEB"
 
@@ -62,6 +70,6 @@ eval "${DEB_OPTS}"
 
 dpkg-deb -I "${NAME}_${VERSION}-${RELEASE}_amd64.deb"
 
-msg_info "Moving DEB to built-packages/DEB/"
+msg_info "Moving DEB to tmp-files/DEB/"
 
-mv "${NAME}_${VERSION}-${RELEASE}_amd64.deb" /data/built-packages/DEB/
+mv "${NAME}_${VERSION}-${RELEASE}_amd64.deb" /data/tmp-files/DEB/

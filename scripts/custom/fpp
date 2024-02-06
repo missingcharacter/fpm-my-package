@@ -2,15 +2,16 @@
 # Enable bash's unofficial strict mode
 GITROOT=$(git rev-parse --show-toplevel)
 export GITROOT
-. "${GITROOT}/lib/strict-mode"
+# shellcheck source=scripts/custom/fpp
+. "${GITROOT}/scripts/lib/strict-mode"
 strictMode
 
 THIS_SCRIPT=$(basename "${0}")
 
 SRC_DIR="/data/${THIS_SCRIPT}"
 
-cd "${SRC_DIR}/PathPicker-0.9.2/debian/"
-# OVERRIDE='cd /data/fpp/PathPicker-0.9.2/debian/ && ./package.sh && mv ../fpp_*_noarch.deb /data/built-packages/DEB/'
+cd "${SRC_DIR}/PathPicker-0.9.2/debian/" || exit 1
+# OVERRIDE='cd /data/fpp/PathPicker-0.9.2/debian/ && ./package.sh && mv ../fpp_*_noarch.deb /data/tmp-files/DEB/'
 #==== Start of custom build steps ====
 
 PTH="$(pwd)"
@@ -23,8 +24,8 @@ mv "${PTH}/usr/share/doc" "${PTH}/usr/local/share/" &&
   mv "${PTH}/usr/share/man" "${PTH}/usr/local/share/" &&
   rmdir "${PTH}/usr/share" &&
   cp -R "${PTH}/../src" "${PTH}/usr/local/share/pathpicker" &&
-  cp "${PTH}/../fpp" "${PTH}/usr/local/share/pathpicker/fpp" &&
-  cd "${PTH}/usr/local/bin/"
+  cp "${PTH}/../fpp" "${PTH}/usr/local/share/pathpicker/fpp"
+cd "${PTH}/usr/local/bin/" || exit 1
 
 echo "Creating symlink..."
 ln -f -s ../share/pathpicker/fpp fpp
@@ -36,12 +37,12 @@ gzip -9 "${PTH}/usr/local/share/doc/pathpicker/changelog" &&
   rm "${PTH}/usr/local/share/doc/pathpicker/changelog.modif"
 
 echo "Setting permissions..."
-cd "${PTH}"
+cd "${PTH}" || exit 1
 find . -type d -exec chmod 755 {} \;
 find . -type f -exec chmod 644 {} \;
 
 rm "${PTH}/package.sh"
-rm -rf "${PTH}/DEBIAN" "${PTH}/usr/share"
+rm -rf "${PTH}/DEBIAN" "${PTH:?}/usr/share"
 chmod 755 usr/local/share/pathpicker/fpp
 chown -R root: "${PTH}/"
 
@@ -59,19 +60,26 @@ function msg_error () {
   printf "%s\n" "${LRED}${*}${NC}"
 }
 
+function cleanup () {
+  msg_info "Deleting ${SRC_DIR} directory and compressed file"
+  rm -rf "${SRC_DIR}"
+}
+# Make sure cleanup runs even if this script fails
+trap cleanup EXIT
+
 msg_info "Debian dependencies are ${DEB_DEPENDENCIES}"
 msg_info "RPM dependencies are ${RPM_DEPENDENCIES}"
 
 DEB_DEPS=""
 IFS=','
-for i in $(echo "${DEB_DEPENDENCIES}"); do
+for i in echo "${DEB_DEPENDENCIES}"; do
   DEB_DEPS="${DEB_DEPS}-d '${i}' "
 done
 IFS=$'\n\t'
 
 RPM_DEPS=""
 IFS=','
-for i in $(echo "${RPM_DEPENDENCIES}"); do
+for i in echo "${RPM_DEPENDENCIES}"; do
   RPM_DEPS="${RPM_DEPS}-d '${i}' "
 done
 IFS=$'\n\t'
@@ -83,9 +91,9 @@ eval "${RPM_OPTS}"
 
 rpm -qpi "${NAME}-${VERSION}-${RELEASE}.noarch.rpm"
 
-msg_info "Moving RPM to built-packages/RPM/"
+msg_info "Moving RPM to tmp-files/RPM/"
 
-mv "${NAME}-${VERSION}-${RELEASE}.noarch.rpm" /data/built-packages/RPM/
+mv "${NAME}-${VERSION}-${RELEASE}.noarch.rpm" /data/tmp-files/RPM/
 
 msg_info "Creating DEB"
 
@@ -94,6 +102,6 @@ eval "${DEB_OPTS}"
 
 dpkg-deb -I "${NAME}_${VERSION}-${RELEASE}_all.deb"
 
-msg_info "Moving DEB to built-packages/DEB/"
+msg_info "Moving DEB to tmp-files/DEB/"
 
-mv "${NAME}_${VERSION}-${RELEASE}_all.deb" /data/built-packages/DEB/
+mv "${NAME}_${VERSION}-${RELEASE}_all.deb" /data/tmp-files/DEB/
