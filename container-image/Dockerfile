@@ -1,10 +1,6 @@
 # Pull base image.
 FROM ubuntu:jammy-20240111
 
-LABEL org.opencontainers.image.source=https://github.com/missingcharacter/fpm-my-package
-LABEL org.opencontainers.image.description="Container with ruby fpm and other tools for building packages."
-LABEL org.opencontainers.image.licenses=MIT
-
 ENV ASDF_DIR=/root/.asdf
 ENV ASDF_POST=/root/post-asdf.sh
 ENV DEBIAN_FRONTEND=noninteractive
