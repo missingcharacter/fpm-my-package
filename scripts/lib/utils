@@ -2,7 +2,7 @@
 GITROOT=$(git rev-parse --show-toplevel)
 export GITROOT
 # shellcheck disable=SC1091
-. "${GITROOT}"/lib/strict-mode
+. "${GITROOT}"/scripts/lib/strict-mode
 strictMode
 
 ANSI_NO_COLOR=$'\033[0m'

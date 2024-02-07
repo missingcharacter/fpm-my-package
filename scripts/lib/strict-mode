@@ -29,7 +29,7 @@ function strictMode() {
     shopt -s extdebug
     IFS=$'\n\t'
     # shellcheck disable=SC1091
-    . "${GITROOT}"/lib/strict-mode-fail
+    . "${GITROOT}"/scripts/lib/strict-mode-fail
     trap 'strictModeFail $?' ERR
 }
 
