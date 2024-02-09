@@ -16,8 +16,6 @@ COPY 01_nodoc /etc/dpkg/dpkg.conf.d/01_nodoc
 COPY 01_norecommend /etc/apt/apt.conf.d/01_norecommend
 COPY asdfrc /root/.asdfrc
 COPY tool-versions /root/.tool-versions
-ADD https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/yq_linux_amd64 /usr/bin/yq
-ADD https://github.com/charmbracelet/gum/releases/download/v${GUM_VERSION}/gum_${GUM_VERSION}_amd64.deb ${GUM_DEB}
 
 # Install FPM.
 RUN --mount=type=bind,source=post-asdf.sh,target=${ASDF_POST} \

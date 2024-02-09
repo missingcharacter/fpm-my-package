@@ -2,6 +2,36 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+function get_os() {
+  local kernel_name
+  kernel_name="$(uname)"
+  case "${kernel_name}" in
+    Linux)
+      echo -n 'linux'
+      ;;
+    Darwin)
+      echo -n 'darwin'
+      ;;
+    *)
+      echo "Sorry, ${kernel_name} is not supported." >&2
+      exit 1
+      ;;
+  esac
+}
+
+function get_arch() {
+  case "$(uname -m)" in
+    armv5*) echo -n "armv5";;
+    armv6*) echo -n "armv6";;
+    armv7*) echo -n "armv7";;
+    aarch64) echo -n "arm64";;
+    x86) echo -n "386";;
+    x86_64) echo -n "amd64";;
+    i686) echo -n "386";;
+    i386) echo -n "386";;
+  esac
+}
+
 function confirm_install() {
   local runtime="${1}"
   local version="${2}"
@@ -45,6 +75,18 @@ while IFS= read -r runtimeVersion; do
     fi
   fi
 done <"${HOME}/.tool-versions"
+
+OS="$(get_os)"
+ARCH="$(get_arch)"
+# YQ_VERSION, GUM_VERSION, GUM_DEB are defined in Dockerfile
+echo "Downloading yq ${YQ_VERSION} and gum ${GUM_VERSION}"
+curl -sL \
+    "https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/yq_${OS}_${ARCH}" \
+    -o /usr/bin/yq
+curl -sL \
+    "https://github.com/charmbracelet/gum/releases/download/v${GUM_VERSION}/gum_${GUM_VERSION}_${ARCH}.deb" \
+    -o "${GUM_DEB}"
+
 
 echo "Updating pip packages"
 pip3 list --outdated --local --format=json | jq -r '.[] | "\(.name)==\(.latest_version)"' | grep --color=auto -v '^\-e' | cut -d = -f 1 | xargs -n1 pip3 install -U
