@@ -1,123 +1,123 @@
 #!/usr/bin/env bash
-set -euo pipefail
-IFS=$'\n\t'
-
+# Enable bash's unofficial strict mode
+GITROOT=$(git rev-parse --show-toplevel)
+export GITROOT
+# shellcheck source=./scripts/build-packages.sh
+. "${GITROOT}/scripts/lib/strict-mode"
+strictMode
+# shellcheck source=./scripts/build-packages.sh
+. "${GITROOT}/scripts/lib/utils"
+# We source asdf to ensure that the correct version of fpm is used
+# Also, this script should only be run inside the container
 # shellcheck source=/dev/null
 . "${HOME}/.asdf/asdf.sh"
 
 THIS_SCRIPT=$(basename "${0}")
 PADDING=$(printf %-${#THIS_SCRIPT}s " ")
+declare -a DEPENDENCIES=("fpm" "rpm" "dpkg-deb")
 
 function usage () {
     echo "Usage:"
-    echo "${THIS_SCRIPT} -n <Name of package> -v <Version of package> -r <Release of package> -s <Source of package>"
-    echo "${PADDING} -c <Creator of package>  -m <Maintainer of package> -l <License of package>"
-    echo "${PADDING} -d <Description of package> -a <RPM dependencies separated by comma> -b <Debian dependencies separated by comma>"
+    echo "${THIS_SCRIPT} -f, --file <YAML file with package details>"
+    echo "${PADDING} -i, --index <Index of package in file>"
+    echo "${PADDING} -s, --source-file <Source file to package>"
     echo
     exit 1
 }
 
-ANSI_NO_COLOR=$'\033[0m'
-function msg_info() {
-  local GREEN=$'\033[0;32m'
-  printf "%s\n" "${GREEN}${*}${ANSI_NO_COLOR}"
-}
-
-function string2array() {
-  local STRING="${1}"
-  local SEPARATOR="${2:-,}"
-  tr "${SEPARATOR}" '\n' <<< "${STRING}"
-}
-
-function deps2args() {
-  declare -a DEPS=( "${@}" )
-  local DEPS_AS_STRING=""
-  for i in "${DEPS[@]}"; do
-    DEPS_AS_STRING="${DEPS_AS_STRING}-d '${i}' "
-  done
-  echo "${DEPS_AS_STRING}"
-}
-
 # Ensure dependencies are present
-if [[ ! -x $(command -v fpm) || ! -x $(command -v rpm) || ! -x $(command -v dpkg-deb) ]] ; then
-    echo "[-] Dependencies unmet.  Please verify that the following are installed and in the PATH:  fpm, rpm, dpkg-deb" >&2
-    exit 1
-fi
+for dep in "${DEPENDENCIES[@]}"; do
+  if [[ ! -x $(command -v "${dep}") ]]; then
+    msg_error "[-] Dependency unmet: ${dep}"
+    msg_fatal "[-] Please verify that the following are installed and in the PATH: ${DEPENDENCIES[*]}"
+  fi
+done
 
-while getopts ":n:v:r:s:c:m:l:d:a:b:" opt; do
-  case ${opt} in
-    n)
-      export NAME=${OPTARG} ;;
-    v)
-      export VERSION=${OPTARG} ;;
-    r)
-      export RELEASE=${OPTARG} ;;
-    s)
-      export SOURCE=${OPTARG} ;;
-    c)
-      export VENDOR=${OPTARG} ;;
-    m)
-      export MAINTAINER=${OPTARG} ;;
-    l)
-      export LICENSE=${OPTARG} ;;
-    d)
-      export DESCRIPTION=${OPTARG} ;;
-    a)
-      mapfile -t RPM_DEPENDENCIES < <(string2array "${OPTARG}") ;;
-    b)
-      mapfile -t DEB_DEPENDENCIES < <(string2array "${OPTARG}") ;;
-    \?)
-      usage ;;
-    :)
-      usage ;;
+while [[ $# -gt 0 ]]; do
+  case "${1}" in
+    -f|--file)
+      PACKAGES_YAML="${2}"
+      shift # past argument
+      shift # past value
+      ;;
+    -i|--index)
+      PACKAGE_INDEX="${2}"
+      shift # past argument
+      shift # past value
+      ;;
+    -s|--source-file)
+      SOURCE_FILE="${2}"
+      shift # past argument
+      shift # past value
+      ;;
+    -*)
+      msg_error "Unknown option ${1}"
+      usage
+      ;;
   esac
 done
 
-if [[ -z ${NAME:-""} ]] || [[ -z ${VERSION:-""} ]] || [[ -z ${RELEASE:-""} ]] || [[ -z ${SOURCE:-""} ]] || [[ -z ${VENDOR:-""} ]] || [[ -z ${MAINTAINER:-""} ]] || [[ -z ${LICENSE:-""} ]] || [[ -z ${DESCRIPTION:-""} ]]; then
-  usage
-fi
+NAME="$(yq e ".packages[${PACKAGE_INDEX}].name" "${PACKAGES_YAML}")"
+VERSION="$(yq e ".packages[${PACKAGE_INDEX}].version" "${PACKAGES_YAML}")"
+RELEASE="$(yq e ".packages[${PACKAGE_INDEX}].release" "${PACKAGES_YAML}")"
+SOURCE="$(yq e ".packages[${PACKAGE_INDEX}].source" "${PACKAGES_YAML}")"
+MAINTAINER="$(yq e ".packages[${PACKAGE_INDEX}].maintainer" "${PACKAGES_YAML}")"
+LICENSE="$(yq e ".packages[${PACKAGE_INDEX}].license" "${PACKAGES_YAML}")"
+DESCRIPTION="$(yq e ".packages[${PACKAGE_INDEX}].description" "${PACKAGES_YAML}")"
+ARCH="$(get_arch)"
+declare -a RPM_DEPS=()
+declare -a DEB_DEPS=()
 
-if [ -n "${DEB_DEPENDENCIES+x}" ] && [ -n "${RPM_DEPENDENCIES+x}" ]; then
-  msg_info "Debian dependencies are ${DEB_DEPENDENCIES[*]}"
-  msg_info "RPM dependencies are ${RPM_DEPENDENCIES[*]}"
+while IFS= read -r dep; do
+  if [[ -n ${dep} ]]; then
+    RPM_DEPS+=("${dep}")
+  fi
+done < <(yq e ".packages[${PACKAGE_INDEX}].rpm_dependencies[]" "${PACKAGES_YAML}")
 
-  DEB_DEPS="$(deps2args "${DEB_DEPENDENCIES[*]}")"
-  RPM_DEPS="$(deps2args "${RPM_DEPENDENCIES[*]}")"
-else
-  msg_info "No dependencies will be set"
-  DEB_DEPS=""
-  RPM_DEPS=""
-fi
+while IFS= read -r dep; do
+  if [[ -n ${dep} ]]; then
+    DEB_DEPS+=("${dep}")
+  fi
+done < <(yq e ".packages[${PACKAGE_INDEX}].deb_dependencies[]" "${PACKAGES_YAML}")
 
-CUSTOM_SCRIPT="/data/custom/${NAME}"
+EXTRACTED_FILE="$(extract_file "${SOURCE_FILE}" "${NAME}" "${VERSION}")"
+
+CUSTOM_SCRIPT="/data/scripts/custom/${NAME}"
 
 if [[ -f "${CUSTOM_SCRIPT}" ]]; then
     bash "${CUSTOM_SCRIPT}"
 else
-  RPM_OPTS="fpm -s dir -t rpm -n ${NAME} -v ${VERSION} --license ${LICENSE} -a native --url ${SOURCE} --prefix '/usr/local/bin' --iteration ${RELEASE} ${RPM_DEPS} -m '${MAINTAINER}' --description '${DESCRIPTION}' -C ./${NAME}"
-  DEB_OPTS="fpm -s dir -t deb -n ${NAME} -v ${VERSION} --license ${LICENSE} -a native --url ${SOURCE} --prefix '/usr/local/bin' --deb-no-default-config-files --iteration ${RELEASE} ${DEB_DEPS} -m '${MAINTAINER}' --description '${DESCRIPTION}' -C ./${NAME}"
+  declare -a FPM_OPTS=(
+    'fpm' '-s' 'dir' '-n' "${NAME}" '-v' "${VERSION}" '--license' "${LICENSE}"
+    '-a' 'native' '--url' "${SOURCE}" '--prefix' '/usr/local/bin'
+    '--iteration' "${RELEASE}" '-m' "${MAINTAINER}" '--description' "${DESCRIPTION}"
+  )
+  declare -a RPM_OPTS=("${FPM_OPTS[@]}" '-t' 'rpm' "${RPM_DEPS[@]}"
+    '-C' "./${EXTRACTED_FILE}")
+  declare -a DEB_OPTS=("${FPM_OPTS[@]}" '-t' 'deb' "${DEB_DEPS[@]}"
+    '-C' "./${EXTRACTED_FILE}")
 
   msg_info "Creating RPM"
 
-  echo "fpm options for RPM are: ${RPM_OPTS}"
+  msg_info "fpm options for RPM are: ${RPM_OPTS[*]}"
 
-  eval "${RPM_OPTS}"
+  "${RPM_OPTS[@]}"
 
-  rpm -qpi "${NAME}-${VERSION}-${RELEASE}.x86_64.rpm"
+  rpm -qpi "${NAME}-${VERSION}-${RELEASE}.$(uname -m).rpm"
 
   msg_info "Moving RPM to tmp-files/RPM/"
 
-  mv "${NAME}-${VERSION}-${RELEASE}.x86_64.rpm" tmp-files/RPM/
+  mv "${NAME}-${VERSION}-${RELEASE}.$(uname -m).rpm" tmp-files/RPM/
 
   msg_info "Creating DEB"
 
-  echo "fpm options for DEB are: ${DEB_OPTS}"
+  msg_info "fpm options for DEB are: ${DEB_OPTS[*]}"
 
-  eval "${DEB_OPTS}"
+  "${DEB_OPTS[@]}"
 
-  dpkg-deb -I "${NAME}_${VERSION}-${RELEASE}_amd64.deb"
+  dpkg-deb -I "${NAME}_${VERSION}-${RELEASE}_${ARCH}.deb"
 
   msg_info "Moving DEB to tmp-files/DEB/"
 
-  mv "${NAME}_${VERSION}-${RELEASE}_amd64.deb" tmp-files/DEB/
+  mv "${NAME}_${VERSION}-${RELEASE}_${ARCH}.deb" tmp-files/DEB/
 fi

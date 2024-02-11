@@ -11,16 +11,12 @@ strictMode
 # Make functions available to 'parallel'
 export ANSI_NO_COLOR
 export REQUIRED_FIELDS
-export -f cleanup
 export -f download_and_build
 export -f msg_info
 export -f msg_error
 export -f msg_fatal
 export -f strictMode
 export -f strictModeFail
-
-# Make sure cleanup runs even if this script fails
-trap cleanup EXIT
 
 # Make these variables available to 'parallel'
 export FPM_TAG='ghcr.io/missingcharacter/fpm-my-package:0.0.3'

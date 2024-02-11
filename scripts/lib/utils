@@ -15,30 +15,33 @@ declare -a REQUIRED_FIELDS=(
   "description"
 )
 
-ANSI_NO_COLOR=$'\033[0m'
-
 function msg_info() {
-  local GREEN=$'\033[0;32m'
-  printf "%s\n" "${GREEN}${*}${ANSI_NO_COLOR}" >&2
+  gum log --time rfc822 --level info "${*}"
 }
 
 function msg_warn() {
-  local YELLOW=$'\033[0;33m'
-  printf "%s\n" "${YELLOW}${*}${ANSI_NO_COLOR}" >&2
+  gum log --time rfc822 --level warn "${*}"
 }
 
 function msg_error() {
-  local RED=$'\033[0;31m'
-  printf "%s\n" "${RED}${*}${ANSI_NO_COLOR}" >&2
+  gum log --time rfc822 --level error "${*}"
 }
 
 function msg_fatal() {
-  msg_error "${*}"
-  exit 1
+  gum log --time rfc822 --level fatal "${*}"
 }
 
-function cleanup () {
-  parallel -j+0 --eta 'msg_info "Deleting {1} directory and compressed file"; rm -rf "{1}_DOWN"; rm -rf {1}' ::: "$(yq e ".packages[].name" packages.yaml)"
+function get_arch() {
+  case "$(uname -m)" in
+    armv5*) echo -n "armv5";;
+    armv6*) echo -n "armv6";;
+    armv7*) echo -n "armv7";;
+    aarch64) echo -n "arm64";;
+    x86) echo -n "386";;
+    x86_64) echo -n "amd64";;
+    i686) echo -n "386";;
+    i386) echo -n "386";;
+  esac
 }
 
 function download_and_build () {
@@ -49,14 +52,20 @@ function download_and_build () {
   local index="${2}"
   local fpm_tag="${3}"
   local name version release source vendor maintainer license description \
-      downloaded_file fpm_opts
+      downloaded_file container_downloaded_file host_downloaded_file \
+      container_packages_yaml fpm_opts
   name="$(yq e ".packages[${index}].name" "${packages_yaml}")"
   version="$(yq e ".packages[${index}].version" "${packages_yaml}")"
   release="$(yq e ".packages[${index}].release" "${packages_yaml}")"
+  vendor="$(yq e ".packages[${index}].vendor" "${packages_yaml}")"
   source="$(yq e ".packages[${index}].source" "${packages_yaml}")"
   maintainer="$(yq e ".packages[${index}].maintainer" "${packages_yaml}")"
   license="$(yq e ".packages[${index}].license" "${packages_yaml}")"
   description="$(yq e ".packages[${index}].description" "${packages_yaml}")"
+  downloaded_file="$(rev <<< "${source}" | cut -d '/' -f 1 | rev)"
+  host_downloaded_file="${GITROOT}/tmp-files/downloads/${downloaded_file}"
+  container_downloaded_file="/data/tmp-files/downloads/${downloaded_file}"
+  container_packages_yaml="/tmp/packages.yaml"
 
   for field in "${REQUIRED_FIELDS[@]}"; do
     if [[ "$(yq e ".packages[${index}].${field}" "${packages_yaml}")" == 'null' ]]; then
@@ -69,39 +78,47 @@ function download_and_build () {
   msg_info "Maintainer is ${maintainer}"
   msg_info "Vendor is ${vendor}, License is ${license}, Description is ${description}"
 
-  downloaded_file="$(rev <<< "${source}" | cut -d '/' -f 1 | rev)"
 
   msg_info "Downloading ${name} version ${version}"
 
-  curl -L "${source}" -o "${GITROOT}/${downloaded_file}"
-
-  mkdir "${name}"
-
-  msg_info "Extracting ${name} version ${version}"
-
-  case "$(file "${downloaded_file}")" in
-    ${downloaded_file}:\ gzip\ compressed\ data*)
-    tar -xzvf "${downloaded_file}" -C "${name}"
-    ;;
-    ${downloaded_file}:\ POSIX\ tar\ archive*)
-    tar -xzvf "${downloaded_file}" -C "${name}"
-    ;;
-    ${downloaded_file}:\ Zip\ archive\ data*)
-    unzip "${downloaded_file}" -d "${name}"
-    ;;
-    *)
-    cleanup
-    msg_fatal "Unknown file type: $(uname)"
-    ;;
-  esac
+  if [[ ! -f "${host_downloaded_file}" ]]; then
+    curl -L "${source}" -o "${host_downloaded_file}"
+  fi
 
   msg_info "Building ${name} version ${version}"
-  fpm_opts="build-packages.sh -n ${name} -v ${version} -r ${release}"
-  fpm_opts+=" -s ${source} -c ${vendor} -l ${license}"
+  fpm_opts="bash /data/scripts/build-packages.sh --file ${container_packages_yaml} --index ${index}"
+  fpm_opts+=" --source-file ${container_downloaded_file}"
 
   msg_info "fpm_opts are: ${fpm_opts}"
   docker run --rm \
       --entrypoint 'bash' \
       -v "${GITROOT}":/data \
+      -v "${packages_yaml}":"${container_packages_yaml}" \
       "${fpm_tag}" -c "${fpm_opts}"
+}
+
+function extract_file() {
+  local downloaded_file="${1}"
+  local name="${2}"
+  local version="${3}"
+  local extracted_file file_headers
+  extracted_file="$(mktemp -d -t "${name}.XXXX")"
+  file_headers="$(file "${downloaded_file}")"
+  msg_info "Extracting ${name} version ${version}"
+
+  case "${file_headers}" in
+    ${downloaded_file}:\ gzip\ compressed\ data*)
+    tar -xzvf "${downloaded_file}" -C "${extracted_file}"
+    ;;
+    ${downloaded_file}:\ POSIX\ tar\ archive*)
+    tar -xzvf "${downloaded_file}" -C "${extracted_file}"
+    ;;
+    ${downloaded_file}:\ Zip\ archive\ data*)
+    unzip "${downloaded_file}" -d "${extracted_file}"
+    ;;
+    *)
+    msg_fatal "Unknown file type: ${file_headers}"
+    ;;
+  esac
+  echo "${extracted_file}"
 }

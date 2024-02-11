@@ -7,6 +7,7 @@ Note: Quick and dirty script
 - git
 - curl
 - docker
+- [gum](https://github.com/charmbracelet/gum)
 - [keyring](https://github.com/jaraco/keyring)
 - [parallel](https://www.gnu.org/software/parallel/)
   - MacOS: `parallel` can be installed via `brew`
