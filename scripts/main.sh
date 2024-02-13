@@ -22,13 +22,22 @@ export -f strictModeFail
 export FPM_TAG='ghcr.io/missingcharacter/fpm-my-package:0.0.3'
 export PACKAGES_YAML="${GITROOT}/packages.yaml"
 NUMBER_OF_PACKAGES=$(yq e '.packages | length' "${PACKAGES_YAML}")
-declare -a DEPENDENCIES=("git" "curl" "docker" "parallel")
+declare -a DEPENDENCIES=(
+  'curl'
+  'cut'
+  'docker'
+  'git'
+  'gum'
+  'parallel'
+  'rev'
+  'yq'
+)
 
 # Ensure dependencies are present
 for dep in "${DEPENDENCIES[@]}"; do
   if [[ ! -x $(command -v "${dep}") ]]; then
     msg_error "[-] Dependency unmet: ${dep}"
-    msg_error "[-] Please verify that the following are installed and in the PATH:  git, curl, docker, parallel"
+    msg_error "[-] Please verify that the following are installed and in the PATH: " "${DEPENDENCIES[@]}"
     msg_fatal "[-] For more on 'parallel' go to: https://www.gnu.org/software/parallel/"
   fi
 done

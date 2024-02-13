@@ -89,7 +89,10 @@ curl -sL \
 
 
 echo "Updating pip packages"
-pip3 list --outdated --local --format=json | jq -r '.[] | "\(.name)==\(.latest_version)"' | grep --color=auto -v '^\-e' | cut -d = -f 1 | xargs -n1 pip3 install -U
+# if no packages are outdate just move on
+(
+  pip3 list --outdated --local --format=json | jq -r '.[] | "\(.name)==\(.latest_version)"' | grep --color=auto -v '^\-e' | cut -d = -f 1 | xargs -n1 pip3 install -U
+) || true
 
 echo "Updating gems"
 gem update --system

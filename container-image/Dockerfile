@@ -34,6 +34,7 @@ RUN --mount=type=bind,source=post-asdf.sh,target=${ASDF_POST} \
         cmake \
         curl \
         fakeroot \
+        file \
         git \
         gpg \
         gpg-agent \
@@ -67,8 +68,10 @@ RUN --mount=type=bind,source=post-asdf.sh,target=${ASDF_POST} \
         pkg-config \
         rpm \
         software-properties-common \
+        tar \
         tk-dev \
         uuid-dev \
+        unzip \
         xclip \
         xsltproc \
         xz-utils \
@@ -84,13 +87,15 @@ RUN --mount=type=bind,source=post-asdf.sh,target=${ASDF_POST} \
     asdf install && \
     echo '===> Running post-asdf.sh...' && \
     bash "${ASDF_POST}" && \
-    echo "===> Installing charmbracelet/gum..." && \
+    echo '===> Installing charmbracelet/gum...' && \
     apt install -y /tmp/gum.deb && \
-    echo '===> Installing yq version ${YQ_VERSION}...' && \
+    echo "===> Installing yq version ${YQ_VERSION}..." && \
     chmod +x /usr/bin/yq && \
     echo "===> Installing fpm version ${FPM_VERSION}..." && \
     gem install fpm -v "${FPM_VERSION}" && \
-    echo '===> Cleaning up after apt ...' && \
+    echo '===> making /data a safe git directory...' && \
+    git config --global --add safe.directory /data && \
+    echo '===> Cleaning up after apt...' && \
     apt autoremove -yqq --purge && \
     apt clean all && \
     rm -rf \

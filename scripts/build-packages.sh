@@ -14,7 +14,16 @@ strictMode
 
 THIS_SCRIPT=$(basename "${0}")
 PADDING=$(printf %-${#THIS_SCRIPT}s " ")
-declare -a DEPENDENCIES=("fpm" "rpm" "dpkg-deb")
+declare -a DEPENDENCIES=(
+  'file'
+  'fpm'
+  'mktemp'
+  'rpm'
+  'dpkg-deb'
+  'tar'
+  'unzip'
+  'yq'
+)
 
 function usage () {
     echo "Usage:"
@@ -29,7 +38,7 @@ function usage () {
 for dep in "${DEPENDENCIES[@]}"; do
   if [[ ! -x $(command -v "${dep}") ]]; then
     msg_error "[-] Dependency unmet: ${dep}"
-    msg_fatal "[-] Please verify that the following are installed and in the PATH: ${DEPENDENCIES[*]}"
+    msg_fatal "[-] Please verify that the following are installed and in the PATH: " "${DEPENDENCIES[@]}"
   fi
 done
 
@@ -93,13 +102,13 @@ else
     '--iteration' "${RELEASE}" '-m' "${MAINTAINER}" '--description' "${DESCRIPTION}"
   )
   declare -a RPM_OPTS=("${FPM_OPTS[@]}" '-t' 'rpm' "${RPM_DEPS[@]}"
-    '-C' "./${EXTRACTED_FILE}")
+    '-C' "${EXTRACTED_FILE}")
   declare -a DEB_OPTS=("${FPM_OPTS[@]}" '-t' 'deb' "${DEB_DEPS[@]}"
-    '-C' "./${EXTRACTED_FILE}")
+    '-C' "${EXTRACTED_FILE}")
 
   msg_info "Creating RPM"
 
-  msg_info "fpm options for RPM are: ${RPM_OPTS[*]}"
+  msg_info "fpm options for RPM are: " "${RPM_OPTS[@]}"
 
   "${RPM_OPTS[@]}"
 
@@ -111,7 +120,7 @@ else
 
   msg_info "Creating DEB"
 
-  msg_info "fpm options for DEB are: ${DEB_OPTS[*]}"
+  msg_info "fpm options for DEB are: " "${DEB_OPTS[@]}"
 
   "${DEB_OPTS[@]}"
 
