@@ -9,9 +9,9 @@ strictMode
 . "${GITROOT}/scripts/lib/utils"
 
 # Make functions available to 'parallel'
-export ANSI_NO_COLOR
 export REQUIRED_FIELDS
 export -f download_and_build
+export -f join_by
 export -f msg_info
 export -f msg_error
 export -f msg_fatal

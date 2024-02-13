@@ -15,20 +15,26 @@ declare -a REQUIRED_FIELDS=(
   "description"
 )
 
+function join_by {
+  local IFS="${1}"
+  shift
+  echo "${*}"
+}
+
 function msg_info() {
-  gum log --time rfc822 --level info "${*}"
+  gum log --time rfc822 --level info "$(join_by ' ' "${@}")"
 }
 
 function msg_warn() {
-  gum log --time rfc822 --level warn "${*}"
+  gum log --time rfc822 --level warn "$(join_by ' ' "${@}")"
 }
 
 function msg_error() {
-  gum log --time rfc822 --level error "${*}"
+  gum log --time rfc822 --level error "$(join_by ' ' "${@}")"
 }
 
 function msg_fatal() {
-  gum log --time rfc822 --level fatal "${*}"
+  gum log --time rfc822 --level fatal "$(join_by ' ' "${@}")"
 }
 
 function get_arch() {
@@ -108,13 +114,13 @@ function extract_file() {
 
   case "${file_headers}" in
     ${downloaded_file}:\ gzip\ compressed\ data*)
-    tar -xzvf "${downloaded_file}" -C "${extracted_file}"
+    tar -xzf "${downloaded_file}" -C "${extracted_file}"
     ;;
     ${downloaded_file}:\ POSIX\ tar\ archive*)
-    tar -xzvf "${downloaded_file}" -C "${extracted_file}"
+    tar -xzf "${downloaded_file}" -C "${extracted_file}"
     ;;
     ${downloaded_file}:\ Zip\ archive\ data*)
-    unzip "${downloaded_file}" -d "${extracted_file}"
+    unzip -qq "${downloaded_file}" -d "${extracted_file}"
     ;;
     *)
     msg_fatal "Unknown file type: ${file_headers}"

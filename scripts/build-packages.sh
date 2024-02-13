@@ -108,7 +108,7 @@ else
 
   msg_info "Creating RPM"
 
-  msg_info "fpm options for RPM are: " "${RPM_OPTS[@]}"
+  msg_info "fpm options for RPM are:" "${RPM_OPTS[@]}"
 
   "${RPM_OPTS[@]}"
 
@@ -120,7 +120,7 @@ else
 
   msg_info "Creating DEB"
 
-  msg_info "fpm options for DEB are: " "${DEB_OPTS[@]}"
+  msg_info "fpm options for DEB are:" "${DEB_OPTS[@]}"
 
   "${DEB_OPTS[@]}"
 
