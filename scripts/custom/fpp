@@ -5,14 +5,28 @@ export GITROOT
 # shellcheck source=scripts/custom/fpp
 . "${GITROOT}/scripts/lib/strict-mode"
 strictMode
+# shellcheck source=scripts/custom/fpp
+. "${GITROOT}/scripts/lib/utils"
+# We source asdf to ensure that the correct version of fpm is used
+# Also, this script should only be run inside the container
+# shellcheck source=/dev/null
+. "${HOME}/.asdf/asdf.sh"
 
-THIS_SCRIPT=$(basename "${0}")
+PACKAGES_YAML="${1}"
+PACKAGE_INDEX="${2}"
+SRC_DIR="${3}"
 
-SRC_DIR="/data/${THIS_SCRIPT}"
+NAME="$(yq e ".packages[${PACKAGE_INDEX}].name" "${PACKAGES_YAML}")"
+VERSION="$(yq e ".packages[${PACKAGE_INDEX}].version" "${PACKAGES_YAML}")"
+RELEASE="$(yq e ".packages[${PACKAGE_INDEX}].release" "${PACKAGES_YAML}")"
+SOURCE="$(yq e ".packages[${PACKAGE_INDEX}].source" "${PACKAGES_YAML}")"
+MAINTAINER="$(yq e ".packages[${PACKAGE_INDEX}].maintainer" "${PACKAGES_YAML}")"
+LICENSE="$(yq e ".packages[${PACKAGE_INDEX}].license" "${PACKAGES_YAML}")"
+DESCRIPTION="$(yq e ".packages[${PACKAGE_INDEX}].description" "${PACKAGES_YAML}")"
 
-cd "${SRC_DIR}/PathPicker-0.9.2/debian/" || exit 1
-# OVERRIDE='cd /data/fpp/PathPicker-0.9.2/debian/ && ./package.sh && mv ../fpp_*_noarch.deb /data/tmp-files/DEB/'
 #==== Start of custom build steps ====
+cd "${SRC_DIR}/PathPicker-${VERSION}/debian/" || exit 1
+# OVERRIDE='cd /data/fpp/PathPicker-0.9.2/debian/ && ./package.sh && mv ../fpp_*_noarch.deb /data/tmp-files/DEB/'
 
 PTH="$(pwd)"
 DATETIME=$(date '+%a, %d %b %Y %H:%M:%S %z')
@@ -27,16 +41,16 @@ mv "${PTH}/usr/share/doc" "${PTH}/usr/local/share/" &&
   cp "${PTH}/../fpp" "${PTH}/usr/local/share/pathpicker/fpp"
 cd "${PTH}/usr/local/bin/" || exit 1
 
-echo "Creating symlink..."
+msg_info "Creating symlink..."
 ln -f -s ../share/pathpicker/fpp fpp
 sed s#__version__#"${VERSION}"# < "${PTH}/usr/local/share/doc/pathpicker/changelog" > "${PTH}/usr/local/share/doc/pathpicker/changelog.modif"
 sed s#__date_timestamp__#"${DATETIME}"# < "${PTH}/usr/local/share/doc/pathpicker/changelog.modif" > "${PTH}/usr/local/share/doc/pathpicker/changelog"
 
-echo "Gziping..."
+msg_info "Gziping..."
 gzip -9 "${PTH}/usr/local/share/doc/pathpicker/changelog" &&
   rm "${PTH}/usr/local/share/doc/pathpicker/changelog.modif"
 
-echo "Setting permissions..."
+msg_info "Setting permissions..."
 cd "${PTH}" || exit 1
 find . -type d -exec chmod 755 {} \;
 find . -type f -exec chmod 644 {} \;
@@ -45,49 +59,35 @@ rm "${PTH}/package.sh"
 rm -rf "${PTH}/DEBIAN" "${PTH:?}/usr/share"
 chmod 755 usr/local/share/pathpicker/fpp
 chown -R root: "${PTH}/"
-
 #===== End of custom build steps =====
 
-function msg_info () {
-  local GREEN=$'\033[0;32m'
-  local NC=$'\033[0m' # No Color
-  printf "%s\n" "${GREEN}${*}${NC}"
-}
+declare -a RPM_DEPS=()
+declare -a DEB_DEPS=()
 
-function msg_error () {
-  local LRED=$'\033[01;31m'
-  local NC=$'\033[0m' # No Color
-  printf "%s\n" "${LRED}${*}${NC}"
-}
+while IFS= read -r dep; do
+  if [[ -n ${dep} ]]; then
+    RPM_DEPS+=('-d' "${dep}")
+  fi
+done < <(yq e ".packages[${PACKAGE_INDEX}].rpm_dependencies[]" "${PACKAGES_YAML}")
 
-function cleanup () {
-  msg_info "Deleting ${SRC_DIR} directory and compressed file"
-  rm -rf "${SRC_DIR}"
-}
-# Make sure cleanup runs even if this script fails
-trap cleanup EXIT
+while IFS= read -r dep; do
+  if [[ -n ${dep} ]]; then
+    DEB_DEPS+=('-d' "${dep}")
+  fi
+done < <(yq e ".packages[${PACKAGE_INDEX}].deb_dependencies[]" "${PACKAGES_YAML}")
 
-msg_info "Debian dependencies are ${DEB_DEPENDENCIES}"
-msg_info "RPM dependencies are ${RPM_DEPENDENCIES}"
-
-DEB_DEPS=""
-IFS=','
-for i in echo "${DEB_DEPENDENCIES}"; do
-  DEB_DEPS="${DEB_DEPS}-d '${i}' "
-done
-IFS=$'\n\t'
-
-RPM_DEPS=""
-IFS=','
-for i in echo "${RPM_DEPENDENCIES}"; do
-  RPM_DEPS="${RPM_DEPS}-d '${i}' "
-done
-IFS=$'\n\t'
+declare -a FPM_OPTS=(
+  'fpm' '-s' 'dir' '-n' "${NAME}" '-v' "${VERSION}" '--license' "${LICENSE}"
+  '-a' 'all' '--url' "${SOURCE}" '--iteration' "${RELEASE}"
+  '-m' "${MAINTAINER}" '--description' "${DESCRIPTION}"
+)
+declare -a RPM_OPTS=("${FPM_OPTS[@]}" '-t' 'rpm' "${RPM_DEPS[@]}" "${PTH}/=/")
+declare -a DEB_OPTS=("${FPM_OPTS[@]}" '-t' 'deb' "${DEB_DEPS[@]}"
+  '--deb-use-file-permissions' '--deb-no-default-config-files' "${PTH}/=/")
 
 msg_info "Creating RPM"
 
-RPM_OPTS="fpm -s dir -t rpm -n '${NAME}' -v '${VERSION}' --license '${LICENSE}' -a all --url '${SOURCE}' --iteration '${RELEASE}' ${RPM_DEPS} -m '${MAINTAINER}' --description '${DESCRIPTION}' ${PTH}/=/"
-eval "${RPM_OPTS}"
+"${RPM_OPTS[@]}"
 
 rpm -qpi "${NAME}-${VERSION}-${RELEASE}.noarch.rpm"
 
@@ -97,8 +97,7 @@ mv "${NAME}-${VERSION}-${RELEASE}.noarch.rpm" /data/tmp-files/RPM/
 
 msg_info "Creating DEB"
 
-DEB_OPTS="fpm -s dir -t deb -n '${NAME}' -v '${VERSION}' --license '${LICENSE}' -a all --url '${SOURCE}' --deb-use-file-permissions --deb-no-default-config-files --iteration '${RELEASE}' ${DEB_DEPS} -m '${MAINTAINER}' --description '${DESCRIPTION}' ${PTH}/=/"
-eval "${DEB_OPTS}"
+"${DEB_OPTS[@]}"
 
 dpkg-deb -I "${NAME}_${VERSION}-${RELEASE}_all.deb"
 

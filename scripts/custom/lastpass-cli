@@ -2,74 +2,80 @@
 # Enable bash's unofficial strict mode
 GITROOT=$(git rev-parse --show-toplevel)
 export GITROOT
-# shellcheck disable=SC1091
-. "${GITROOT}/lib/strict-mode"
+# shellcheck source=scripts/custom/lastpass-cli
+. "${GITROOT}/scripts/lib/strict-mode"
 strictMode
+# shellcheck source=scripts/custom/lastpass-cli
+. "${GITROOT}/scripts/lib/utils"
+# We source asdf to ensure that the correct version of fpm is used
+# Also, this script should only be run inside the container
+# shellcheck source=/dev/null
+. "${HOME}/.asdf/asdf.sh"
 
-THIS_SCRIPT=$(basename "${0}")
+PACKAGES_YAML="${1}"
+PACKAGE_INDEX="${2}"
+SRC_DIR="${3}"
 
-SRC_DIR="/data/${THIS_SCRIPT}"
+NAME="$(yq e ".packages[${PACKAGE_INDEX}].name" "${PACKAGES_YAML}")"
+VERSION="$(yq e ".packages[${PACKAGE_INDEX}].version" "${PACKAGES_YAML}")"
+RELEASE="$(yq e ".packages[${PACKAGE_INDEX}].release" "${PACKAGES_YAML}")"
+SOURCE="$(yq e ".packages[${PACKAGE_INDEX}].source" "${PACKAGES_YAML}")"
+MAINTAINER="$(yq e ".packages[${PACKAGE_INDEX}].maintainer" "${PACKAGES_YAML}")"
+LICENSE="$(yq e ".packages[${PACKAGE_INDEX}].license" "${PACKAGES_YAML}")"
+DESCRIPTION="$(yq e ".packages[${PACKAGE_INDEX}].description" "${PACKAGES_YAML}")"
+ARCH="$(get_arch)"
 
-cd "${SRC_DIR}" || exit
+#==== Start of custom build steps ====
+cd "${SRC_DIR}/lastpass-cli-${VERSION}" || exit
 
+export ASDF_PYTHON_VERSION='system'
 make
 make install DESTDIR=/opt
 make install-doc DESTDIR=/opt
+unset ASDF_PYTHON_VERSION
+#===== End of custom build steps =====
 
-function msg_info () {
-  local GREEN=$'\033[0;32m'
-  local NC=$'\033[0m' # No Color
-  printf "%s\n" "${GREEN}${*}${NC}"
-}
+declare -a RPM_DEPS=()
+declare -a DEB_DEPS=()
 
-function msg_error () {
-  local LRED=$'\033[01;31m'
-  local NC=$'\033[0m' # No Color
-  printf "%s\n" "${LRED}${*}${NC}"
-}
+while IFS= read -r dep; do
+  if [[ -n ${dep} ]]; then
+    RPM_DEPS+=('-d' "${dep}")
+  fi
+done < <(yq e ".packages[${PACKAGE_INDEX}].rpm_dependencies[]" "${PACKAGES_YAML}")
 
-function cleanup () {
-  msg_info "Deleting ${SRC_DIR} directory and compressed file"
-  rm -rf "${SRC_DIR}"
-}
-# Make sure cleanup runs even if this script fails
-trap cleanup EXIT
+while IFS= read -r dep; do
+  if [[ -n ${dep} ]]; then
+    DEB_DEPS+=('-d' "${dep}")
+  fi
+done < <(yq e ".packages[${PACKAGE_INDEX}].deb_dependencies[]" "${PACKAGES_YAML}")
 
-msg_info "Debian dependencies are ${DEB_DEPENDENCIES}"
-msg_info "RPM dependencies are ${RPM_DEPENDENCIES}"
-
-DEB_DEPS=""
-IFS=','
-for i in echo "${DEB_DEPENDENCIES}"; do
-  DEB_DEPS="${DEB_DEPS}-d '${i}' "
-done
-IFS=$'\n\t'
-
-RPM_DEPS=""
-IFS=','
-for i in echo "${RPM_DEPENDENCIES}"; do
-  RPM_DEPS="${RPM_DEPS}-d '${i}' "
-done
-IFS=$'\n\t'
+declare -a FPM_OPTS=(
+  'fpm' '-s' 'dir' '-n' "${NAME}" '-v' "${VERSION}" '--license' "${LICENSE}"
+  '-a' 'native' '--url' "${SOURCE}" '--iteration' "${RELEASE}"
+  '-m' "${MAINTAINER}" '--description' "${DESCRIPTION}"
+)
+declare -a RPM_OPTS=("${FPM_OPTS[@]}" '-t' 'rpm' "${RPM_DEPS[@]}"
+  '/opt/usr/=/usr/local')
+declare -a DEB_OPTS=("${FPM_OPTS[@]}" '-t' 'deb' "${DEB_DEPS[@]}"
+  '--deb-no-default-config-files' '/opt/usr/=/usr/local')
 
 msg_info "Creating RPM"
 
-RPM_OPTS="fpm -s dir -t rpm -n '${NAME}' -v '${VERSION}' --license '${LICENSE}' -a native --url '${SOURCE}' --iteration '${RELEASE}' ${RPM_DEPS} -m '${MAINTAINER}' --description '${DESCRIPTION}' /opt/usr/=/usr/local"
-eval "${RPM_OPTS}"
+"${RPM_OPTS[@]}"
 
-rpm -qpi "${NAME}-${VERSION}-${RELEASE}.x86_64.rpm"
+rpm -qpi "${NAME}-${VERSION}-${RELEASE}.$(uname -m).rpm"
 
 msg_info "Moving RPM to tmp-files/RPM/"
 
-mv "${NAME}-${VERSION}-${RELEASE}.x86_64.rpm" /data/tmp-files/RPM/
+mv "${NAME}-${VERSION}-${RELEASE}.$(uname -m).rpm" /data/tmp-files/RPM/
 
 msg_info "Creating DEB"
 
-DEB_OPTS="fpm -s dir -t deb -n '${NAME}' -v '${VERSION}' --license '${LICENSE}' -a native --url '${SOURCE}' --deb-no-default-config-files --iteration '${RELEASE}' ${DEB_DEPS} -m '${MAINTAINER}' --description '${DESCRIPTION}' /opt/usr/=/usr/local"
-eval "${DEB_OPTS}"
+"${DEB_OPTS[@]}"
 
-dpkg-deb -I "${NAME}_${VERSION}-${RELEASE}_amd64.deb"
+dpkg-deb -I "${NAME}_${VERSION}-${RELEASE}_${ARCH}.deb"
 
 msg_info "Moving DEB to tmp-files/DEB/"
 
-mv "${NAME}_${VERSION}-${RELEASE}_amd64.deb" /data/tmp-files/DEB/
+mv "${NAME}_${VERSION}-${RELEASE}_${ARCH}.deb" /data/tmp-files/DEB/

@@ -79,13 +79,13 @@ declare -a DEB_DEPS=()
 
 while IFS= read -r dep; do
   if [[ -n ${dep} ]]; then
-    RPM_DEPS+=("${dep}")
+    RPM_DEPS+=('-d' "${dep}")
   fi
 done < <(yq e ".packages[${PACKAGE_INDEX}].rpm_dependencies[]" "${PACKAGES_YAML}")
 
 while IFS= read -r dep; do
   if [[ -n ${dep} ]]; then
-    DEB_DEPS+=("${dep}")
+    DEB_DEPS+=('-d' "${dep}")
   fi
 done < <(yq e ".packages[${PACKAGE_INDEX}].deb_dependencies[]" "${PACKAGES_YAML}")
 
@@ -94,7 +94,7 @@ EXTRACTED_FILE="$(extract_file "${SOURCE_FILE}" "${NAME}" "${VERSION}")"
 CUSTOM_SCRIPT="/data/scripts/custom/${NAME}"
 
 if [[ -f "${CUSTOM_SCRIPT}" ]]; then
-    bash "${CUSTOM_SCRIPT}"
+    bash "${CUSTOM_SCRIPT}" "${PACKAGES_YAML}" "${PACKAGE_INDEX}"  "${EXTRACTED_FILE}"
 else
   declare -a FPM_OPTS=(
     'fpm' '-s' 'dir' '-n' "${NAME}" '-v' "${VERSION}" '--license' "${LICENSE}"
