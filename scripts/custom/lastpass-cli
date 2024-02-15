@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# file is sourced from build-packages.sh
+# there is no need to source strict-mode, utils, or asdf
+VERSION="${1}"
+SRC_DIR="${2}"
+
+#==== Start of custom build steps ====
+ORIG_PATH="$(pwd)"
+cd "${SRC_DIR}/lastpass-cli-${VERSION}" || exit
+
+export ASDF_PYTHON_VERSION='system'
+make
+make install DESTDIR=/opt
+make install-doc DESTDIR=/opt
+unset ASDF_PYTHON_VERSION
+cd  "${ORIG_PATH}" || exit 1
+#===== End of custom build steps =====

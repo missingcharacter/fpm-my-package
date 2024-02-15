@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# file is sourced from build-packages.sh
+# there is no need to source strict-mode, utils, or asdf
+VERSION="${1}"
+SRC_DIR="${2}"
+
+#==== Start of custom build steps ====
+ORIG_PATH="$(pwd)"
+cd "${SRC_DIR}/PathPicker-${VERSION}/debian/" || exit 1
+# OVERRIDE='cd /data/fpp/PathPicker-0.9.2/debian/ && ./package.sh && mv ../fpp_*_noarch.deb /data/tmp-files/DEB/'
+
+PTH="$(pwd)"
+export PTH
+DATETIME=$(date '+%a, %d %b %Y %H:%M:%S %z')
+
+mkdir -p "${PTH}/usr/local/bin" &&
+  mkdir -p "${PTH}/usr/local/share/pathpicker/src/"
+
+mv "${PTH}/usr/share/doc" "${PTH}/usr/local/share/" &&
+  mv "${PTH}/usr/share/man" "${PTH}/usr/local/share/" &&
+  rmdir "${PTH}/usr/share" &&
+  cp -R "${PTH}/../src" "${PTH}/usr/local/share/pathpicker" &&
+  cp "${PTH}/../fpp" "${PTH}/usr/local/share/pathpicker/fpp"
+cd "${PTH}/usr/local/bin/" || exit 1
+
+msg_info "Creating symlink..."
+ln -f -s ../share/pathpicker/fpp fpp
+sed s#__version__#"${VERSION}"# < "${PTH}/usr/local/share/doc/pathpicker/changelog" > "${PTH}/usr/local/share/doc/pathpicker/changelog.modif"
+sed s#__date_timestamp__#"${DATETIME}"# < "${PTH}/usr/local/share/doc/pathpicker/changelog.modif" > "${PTH}/usr/local/share/doc/pathpicker/changelog"
+
+msg_info "Gziping..."
+gzip -9 "${PTH}/usr/local/share/doc/pathpicker/changelog" &&
+  rm "${PTH}/usr/local/share/doc/pathpicker/changelog.modif"
+
+msg_info "Setting permissions..."
+cd "${PTH}" || exit 1
+find . -type d -exec chmod 755 {} \;
+find . -type f -exec chmod 644 {} \;
+
+rm "${PTH}/package.sh"
+rm -rf "${PTH}/DEBIAN" "${PTH:?}/usr/share"
+chmod 755 usr/local/share/pathpicker/fpp
+chown -R root: "${PTH}/"
+cd  "${ORIG_PATH}" || exit 1
+#===== End of custom build steps =====

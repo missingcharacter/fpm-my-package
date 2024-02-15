@@ -1,8 +1,0 @@
-NAME='packer'
-VERSION='1.3.4'
-RELEASE='0'
-SOURCE='https://releases.hashicorp.com/packer/1.3.4/packer_1.3.4_linux_amd64.zip'
-VENDOR='Hashicorp'
-MAINTAINER='user@domain.com'
-LICENSE='MPL2'
-DESCRIPTION='Packer utility built from zip.'

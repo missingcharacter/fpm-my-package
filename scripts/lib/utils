@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+GITROOT=$(git rev-parse --show-toplevel)
+export GITROOT
+# shellcheck disable=SC1091
+. "${GITROOT}"/scripts/lib/strict-mode
+strictMode
+
+declare -a REQUIRED_FIELDS=(
+  'name'
+  'version'
+  'release'
+  'source'
+  'vendor'
+  'license'
+  'description'
+  'files_flags'
+)
+
+function join_by {
+  local IFS="${1}"
+  shift
+  echo "${*}"
+}
+
+function msg_info() {
+  gum log --time rfc822 --level info "$(join_by ' ' "${@}")"
+}
+
+function msg_warn() {
+  gum log --time rfc822 --level warn "$(join_by ' ' "${@}")"
+}
+
+function msg_error() {
+  gum log --time rfc822 --level error "$(join_by ' ' "${@}")"
+}
+
+function msg_fatal() {
+  gum log --time rfc822 --level fatal "$(join_by ' ' "${@}")"
+}
+
+function get_arch() {
+  case "$(uname -m)" in
+    armv5*) echo -n 'armv5';;
+    armv6*) echo -n 'armv6';;
+    armv7*) echo -n 'armv7';;
+    aarch64) echo -n 'arm64';;
+    x86) echo -n '386';;
+    x86_64) echo -n 'amd64';;
+    i686) echo -n '386';;
+    i386) echo -n '386';;
+  esac
+}
+
+function download_and_build () {
+  # Enable bash's unofficial strict mode
+  strictMode
+
+  local packages_yaml="${1}"
+  local index="${2}"
+  local fpm_tag="${3}"
+  local name version release source vendor maintainer license description \
+      downloaded_file container_downloaded_file host_downloaded_file \
+      container_packages_yaml fpm_opts
+  name="$(yq e ".packages[${index}].name" "${packages_yaml}")"
+  version="$(yq e ".packages[${index}].version" "${packages_yaml}")"
+  release="$(yq e ".packages[${index}].release" "${packages_yaml}")"
+  vendor="$(yq e ".packages[${index}].vendor" "${packages_yaml}")"
+  source="$(yq e ".packages[${index}].source" "${packages_yaml}")"
+  maintainer="$(yq e ".packages[${index}].maintainer" "${packages_yaml}")"
+  license="$(yq e ".packages[${index}].license" "${packages_yaml}")"
+  description="$(yq e ".packages[${index}].description" "${packages_yaml}")"
+  downloaded_file="$(rev <<< "${source}" | cut -d '/' -f 1 | rev)"
+  host_downloaded_file="${GITROOT}/tmp-files/downloads/${downloaded_file}"
+  container_downloaded_file="/data/tmp-files/downloads/${downloaded_file}"
+  container_packages_yaml="/tmp/packages.yaml"
+
+  for field in "${REQUIRED_FIELDS[@]}"; do
+    if [[ "$(yq e ".packages[${index}].${field}" "${packages_yaml}")" == 'null' ]]; then
+      msg_fatal "[-] Package configuration for ${name} is missing the ${field} field. See this project's README for more details"
+    fi
+  done
+
+  msg_info "Name is ${name}, Version is ${version}, Release is ${release}"
+  msg_info "Source is ${source}"
+  msg_info "Maintainer is ${maintainer}"
+  msg_info "Vendor is ${vendor}, License is ${license}, Description is ${description}"
+
+
+  msg_info "Downloading ${name} version ${version}"
+
+  if [[ ! -f "${host_downloaded_file}" ]]; then
+    curl -L "${source}" -o "${host_downloaded_file}"
+  fi
+
+  msg_info "Building ${name} version ${version}"
+  fpm_opts="bash /data/scripts/build-packages.sh --file ${container_packages_yaml} --index ${index}"
+  fpm_opts+=" --source-file ${container_downloaded_file}"
+
+  msg_info "fpm_opts are: ${fpm_opts}"
+  docker run --rm \
+      --entrypoint 'bash' \
+      -v "${GITROOT}":/data \
+      -v "${packages_yaml}":"${container_packages_yaml}" \
+      "${fpm_tag}" -c "${fpm_opts}"
+}
+
+function extract_file() {
+  local downloaded_file="${1}"
+  local name="${2}"
+  local version="${3}"
+  local extracted_file file_headers
+  extracted_file="$(mktemp -d -t "${name}.XXXX")"
+  file_headers="$(file "${downloaded_file}")"
+  msg_info "Extracting ${name} version ${version}"
+
+  case "${file_headers}" in
+    ${downloaded_file}:\ gzip\ compressed\ data*)
+    tar -xzf "${downloaded_file}" -C "${extracted_file}"
+    ;;
+    ${downloaded_file}:\ POSIX\ tar\ archive*)
+    tar -xzf "${downloaded_file}" -C "${extracted_file}"
+    ;;
+    ${downloaded_file}:\ Zip\ archive\ data*)
+    unzip -qq "${downloaded_file}" -d "${extracted_file}"
+    ;;
+    *)
+    msg_fatal "Unknown file type: ${file_headers}"
+    ;;
+  esac
+  echo "${extracted_file}"
+}

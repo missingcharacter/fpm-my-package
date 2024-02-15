@@ -2,9 +2,11 @@
 # Enable bash's unofficial strict mode
 GITROOT=$(git rev-parse --show-toplevel)
 export GITROOT
-. "${GITROOT}/lib/strict-mode"
+# shellcheck source=./scripts/upload.sh
+. "${GITROOT}/scripts/lib/strict-mode"
 strictMode
-. "${GITROOT}/lib/utils"
+# shellcheck source=./scripts/upload.sh
+. "${GITROOT}/scripts/lib/utils"
 
 # Make message functions available to 'parallel'
 export -f msg_info
@@ -19,7 +21,7 @@ if [[ ! -x $(command -v git) || ! -x $(command -v curl) || ! -x $(command -v par
     exit 1
 fi
 
-PACKAGES=( $(ls built-packages/DEB/*) )
+mapfile -t PACKAGES < <(ls tmp-files/DEB/*)
 
 function upload_package () {
   # Enable bash's unofficial strict mode
@@ -28,20 +30,21 @@ function upload_package () {
   local PATH_TO_PACKAGE="${1}"
   local PACKAGE="${PATH_TO_PACKAGE##*/}"
   local FILENAME="${PACKAGE%.*}"
-  local FILE_EXT="${PACKAGE##*.}"
-  local PACKAGE_INFO="${GITROOT}/packages/$(echo ${FILENAME} | cut -d '_' -f1)"
-  local PACKAGE_NAME="$(gettoken NAME ${PACKAGE_INFO})"
+  #local FILE_EXT="${PACKAGE##*.}"
+  local PACKAGE_INFO PACKAGE_NAME PACKAGE_VERSION DEB_ARCH BINTRAY_API_KEY
+  PACKAGE_INFO="${GITROOT}/packages/$(echo "${FILENAME}" | cut -d '_' -f1)"
+  PACKAGE_NAME="$(gettoken NAME "${PACKAGE_INFO}")"
   PACKAGE_NAME="${PACKAGE_NAME//\'/}"
-  local PACKAGE_VERSION="$(gettoken VERSION ${PACKAGE_INFO})"
+  PACKAGE_VERSION="$(gettoken VERSION "${PACKAGE_INFO}")"
   PACKAGE_VERSION="${PACKAGE_VERSION//\'/}"
-  local DEB_ARCH="$(echo ${FILENAME} | cut -d '_' -f3)"
+  DEB_ARCH="$(echo "${FILENAME}" | cut -d '_' -f3)"
   # Source: https://www.jfrog.com/confluence/display/JFROG/Debian+Repositories
   # Source: https://www.jfrog.com/confluence/display/BT/Bintray+REST+API
   if [[ "${DEB_ARCH}" == 'noarch' ]]; then DEB_ARCH='all'; fi
   local DEB_DISTROS='buster,bionic,eoan,focal'
-  local DEB_COMPONENT='stable'
+  #local DEB_COMPONENT='stable'
   local BINTRAY_BASE_URL='https://api.bintray.com/content'
-  local BINTRAY_API_KEY="$(keyring get bintray BINTRAY_API_KEY)"
+  BINTRAY_API_KEY="$(keyring get bintray BINTRAY_API_KEY)"
   local BINTRAY_USER='missingcharacter'
   local HTTP_AUTH="${BINTRAY_USER}:${BINTRAY_API_KEY}"
   local BINTRAY_REPO='fpm-my-package'
