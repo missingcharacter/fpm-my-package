@@ -73,9 +73,21 @@ SOURCE="$(yq e ".packages[${PACKAGE_INDEX}].source" "${PACKAGES_YAML}")"
 MAINTAINER="$(yq e ".packages[${PACKAGE_INDEX}].maintainer" "${PACKAGES_YAML}")"
 LICENSE="$(yq e ".packages[${PACKAGE_INDEX}].license" "${PACKAGES_YAML}")"
 DESCRIPTION="$(yq e ".packages[${PACKAGE_INDEX}].description" "${PACKAGES_YAML}")"
-ARCH="$(get_arch)"
+NOARCH="$(yq e ".packages[${PACKAGE_INDEX}].noarch" "${PACKAGES_YAML}")"
+DEB_ARCH="$(get_arch)"
+ARCHITECTURE='native'
+RPM_FILE_NAME="${NAME}-${VERSION}-${RELEASE}.$(uname -m).rpm"
+DEB_FILE_NAME="${NAME}_${VERSION}-${RELEASE}_${DEB_ARCH}.deb"
+if [[ "${NOARCH}" == 'true' ]]; then
+  ARCHITECTURE='all'
+  RPM_FILE_NAME="${NAME}-${VERSION}-${RELEASE}.noarch.rpm"
+  DEB_FILE_NAME="${NAME}_${VERSION}-${RELEASE}_all.deb"
+fi
 declare -a RPM_DEPS=()
+declare -a RPM_FLAGS=()
 declare -a DEB_DEPS=()
+declare -a DEB_FLAGS=()
+declare -a FILES_FLAGS=()
 
 while IFS= read -r dep; do
   if [[ -n ${dep} ]]; then
@@ -83,50 +95,73 @@ while IFS= read -r dep; do
   fi
 done < <(yq e ".packages[${PACKAGE_INDEX}].rpm_dependencies[]" "${PACKAGES_YAML}")
 
+while IFS= read -r flag; do
+  if [[ -n ${flag} ]]; then
+    RPM_FLAGS+=("${flag}")
+  fi
+done < <(yq e ".packages[${PACKAGE_INDEX}].rpm_flags[]" "${PACKAGES_YAML}")
+
 while IFS= read -r dep; do
   if [[ -n ${dep} ]]; then
     DEB_DEPS+=('-d' "${dep}")
   fi
 done < <(yq e ".packages[${PACKAGE_INDEX}].deb_dependencies[]" "${PACKAGES_YAML}")
 
+while IFS= read -r flag; do
+  if [[ -n ${flag} ]]; then
+    DEB_FLAGS+=("${flag}")
+  fi
+done < <(yq e ".packages[${PACKAGE_INDEX}].deb_flags[]" "${PACKAGES_YAML}")
+
 EXTRACTED_FILE="$(extract_file "${SOURCE_FILE}" "${NAME}" "${VERSION}")"
+export EXTRACTED_FILE
 
 CUSTOM_SCRIPT="/data/scripts/custom/${NAME}"
 
 if [[ -f "${CUSTOM_SCRIPT}" ]]; then
-    bash "${CUSTOM_SCRIPT}" "${PACKAGES_YAML}" "${PACKAGE_INDEX}"  "${EXTRACTED_FILE}"
-else
-  declare -a FPM_OPTS=(
-    'fpm' '-s' 'dir' '-n' "${NAME}" '-v' "${VERSION}" '--license' "${LICENSE}"
-    '-a' 'native' '--url' "${SOURCE}" '--prefix' '/usr/local/bin'
-    '--iteration' "${RELEASE}" '-m' "${MAINTAINER}" '--description' "${DESCRIPTION}"
-  )
-  declare -a RPM_OPTS=("${FPM_OPTS[@]}" '-t' 'rpm' "${RPM_DEPS[@]}"
-    '-C' "${EXTRACTED_FILE}")
-  declare -a DEB_OPTS=("${FPM_OPTS[@]}" '-t' 'deb' "${DEB_DEPS[@]}"
-    '-C' "${EXTRACTED_FILE}")
-
-  msg_info "Creating RPM"
-
-  msg_info "fpm options for RPM are:" "${RPM_OPTS[@]}"
-
-  "${RPM_OPTS[@]}"
-
-  rpm -qpi "${NAME}-${VERSION}-${RELEASE}.$(uname -m).rpm"
-
-  msg_info "Moving RPM to tmp-files/RPM/"
-
-  mv "${NAME}-${VERSION}-${RELEASE}.$(uname -m).rpm" tmp-files/RPM/
-
-  msg_info "Creating DEB"
-
-  msg_info "fpm options for DEB are:" "${DEB_OPTS[@]}"
-
-  "${DEB_OPTS[@]}"
-
-  dpkg-deb -I "${NAME}_${VERSION}-${RELEASE}_${ARCH}.deb"
-
-  msg_info "Moving DEB to tmp-files/DEB/"
-
-  mv "${NAME}_${VERSION}-${RELEASE}_${ARCH}.deb" tmp-files/DEB/
+  # shellcheck source=/dev/null
+  . "${CUSTOM_SCRIPT}" "${VERSION}" "${EXTRACTED_FILE}"
 fi
+
+# `eval` is used to expand the variables in the flags
+while IFS= read -r flag; do
+  if [[ -n ${flag} ]]; then
+    FILES_FLAGS+=("$(eval "echo ${flag}")")
+    msg_info "Adding flag" "${flag}"
+    msg_info "Expanded flag" "$(eval "echo ${flag}")"
+  fi
+done < <(yq e ".packages[${PACKAGE_INDEX}].files_flags[]" "${PACKAGES_YAML}")
+
+declare -a FPM_OPTS=(
+  'fpm' '-s' 'dir' '-n' "${NAME}" '-v' "${VERSION}" '--license' "${LICENSE}"
+  '-a' "${ARCHITECTURE}" '--url' "${SOURCE}" '--iteration' "${RELEASE}"
+  '-m' "${MAINTAINER}" '--description' "${DESCRIPTION}"
+)
+declare -a RPM_OPTS=("${FPM_OPTS[@]}" '-t' 'rpm' "${RPM_DEPS[@]}"
+  "${RPM_FLAGS[@]}" "${FILES_FLAGS[@]}")
+declare -a DEB_OPTS=("${FPM_OPTS[@]}" '-t' 'deb' "${DEB_DEPS[@]}"
+  "${DEB_FLAGS[@]}" "${FILES_FLAGS[@]}")
+
+msg_info "Creating RPM"
+
+msg_info "fpm options for RPM are:" "${RPM_OPTS[@]}"
+
+"${RPM_OPTS[@]}"
+
+rpm -qpi "${RPM_FILE_NAME}"
+
+msg_info "Moving RPM to /data/tmp-files/RPM/"
+
+mv "${RPM_FILE_NAME}" /data/tmp-files/RPM/
+
+msg_info "Creating DEB"
+
+msg_info "fpm options for DEB are:" "${DEB_OPTS[@]}"
+
+"${DEB_OPTS[@]}"
+
+dpkg-deb -I "${DEB_FILE_NAME}"
+
+msg_info "Moving DEB to /data/tmp-files/DEB/"
+
+mv "${DEB_FILE_NAME}" /data/tmp-files/DEB/

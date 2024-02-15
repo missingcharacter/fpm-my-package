@@ -1,34 +1,16 @@
 #!/usr/bin/env bash
-# Enable bash's unofficial strict mode
-GITROOT=$(git rev-parse --show-toplevel)
-export GITROOT
-# shellcheck source=scripts/custom/fpp
-. "${GITROOT}/scripts/lib/strict-mode"
-strictMode
-# shellcheck source=scripts/custom/fpp
-. "${GITROOT}/scripts/lib/utils"
-# We source asdf to ensure that the correct version of fpm is used
-# Also, this script should only be run inside the container
-# shellcheck source=/dev/null
-. "${HOME}/.asdf/asdf.sh"
-
-PACKAGES_YAML="${1}"
-PACKAGE_INDEX="${2}"
-SRC_DIR="${3}"
-
-NAME="$(yq e ".packages[${PACKAGE_INDEX}].name" "${PACKAGES_YAML}")"
-VERSION="$(yq e ".packages[${PACKAGE_INDEX}].version" "${PACKAGES_YAML}")"
-RELEASE="$(yq e ".packages[${PACKAGE_INDEX}].release" "${PACKAGES_YAML}")"
-SOURCE="$(yq e ".packages[${PACKAGE_INDEX}].source" "${PACKAGES_YAML}")"
-MAINTAINER="$(yq e ".packages[${PACKAGE_INDEX}].maintainer" "${PACKAGES_YAML}")"
-LICENSE="$(yq e ".packages[${PACKAGE_INDEX}].license" "${PACKAGES_YAML}")"
-DESCRIPTION="$(yq e ".packages[${PACKAGE_INDEX}].description" "${PACKAGES_YAML}")"
+# file is sourced from build-packages.sh
+# there is no need to source strict-mode, utils, or asdf
+VERSION="${1}"
+SRC_DIR="${2}"
 
 #==== Start of custom build steps ====
+ORIG_PATH="$(pwd)"
 cd "${SRC_DIR}/PathPicker-${VERSION}/debian/" || exit 1
 # OVERRIDE='cd /data/fpp/PathPicker-0.9.2/debian/ && ./package.sh && mv ../fpp_*_noarch.deb /data/tmp-files/DEB/'
 
 PTH="$(pwd)"
+export PTH
 DATETIME=$(date '+%a, %d %b %Y %H:%M:%S %z')
 
 mkdir -p "${PTH}/usr/local/bin" &&
@@ -59,48 +41,5 @@ rm "${PTH}/package.sh"
 rm -rf "${PTH}/DEBIAN" "${PTH:?}/usr/share"
 chmod 755 usr/local/share/pathpicker/fpp
 chown -R root: "${PTH}/"
+cd  "${ORIG_PATH}" || exit 1
 #===== End of custom build steps =====
-
-declare -a RPM_DEPS=()
-declare -a DEB_DEPS=()
-
-while IFS= read -r dep; do
-  if [[ -n ${dep} ]]; then
-    RPM_DEPS+=('-d' "${dep}")
-  fi
-done < <(yq e ".packages[${PACKAGE_INDEX}].rpm_dependencies[]" "${PACKAGES_YAML}")
-
-while IFS= read -r dep; do
-  if [[ -n ${dep} ]]; then
-    DEB_DEPS+=('-d' "${dep}")
-  fi
-done < <(yq e ".packages[${PACKAGE_INDEX}].deb_dependencies[]" "${PACKAGES_YAML}")
-
-declare -a FPM_OPTS=(
-  'fpm' '-s' 'dir' '-n' "${NAME}" '-v' "${VERSION}" '--license' "${LICENSE}"
-  '-a' 'all' '--url' "${SOURCE}" '--iteration' "${RELEASE}"
-  '-m' "${MAINTAINER}" '--description' "${DESCRIPTION}"
-)
-declare -a RPM_OPTS=("${FPM_OPTS[@]}" '-t' 'rpm' "${RPM_DEPS[@]}" "${PTH}/=/")
-declare -a DEB_OPTS=("${FPM_OPTS[@]}" '-t' 'deb' "${DEB_DEPS[@]}"
-  '--deb-use-file-permissions' '--deb-no-default-config-files' "${PTH}/=/")
-
-msg_info "Creating RPM"
-
-"${RPM_OPTS[@]}"
-
-rpm -qpi "${NAME}-${VERSION}-${RELEASE}.noarch.rpm"
-
-msg_info "Moving RPM to tmp-files/RPM/"
-
-mv "${NAME}-${VERSION}-${RELEASE}.noarch.rpm" /data/tmp-files/RPM/
-
-msg_info "Creating DEB"
-
-"${DEB_OPTS[@]}"
-
-dpkg-deb -I "${NAME}_${VERSION}-${RELEASE}_all.deb"
-
-msg_info "Moving DEB to tmp-files/DEB/"
-
-mv "${NAME}_${VERSION}-${RELEASE}_all.deb" /data/tmp-files/DEB/
