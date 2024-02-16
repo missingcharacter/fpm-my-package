@@ -1,4 +1,4 @@
-# Pull base image.
+# syntax=docker/dockerfile:1
 FROM ubuntu:jammy-20240111
 
 ENV ASDF_DIR=/root/.asdf
@@ -19,8 +19,6 @@ COPY tool-versions /root/.tool-versions
 
 # Install FPM.
 RUN --mount=type=bind,source=post-asdf.sh,target=${ASDF_POST} \
-    echo '===> Checking for OS updates...' && \
-    echo 'deb http://archive.ubuntu.com/ubuntu/ jammy-proposed restricted main multiverse universe' > /etc/apt/sources.list.d/jammy-proposed.list && \
     apt update && \
     apt -y dist-upgrade && \
     echo '===> Installing packages...' && \
