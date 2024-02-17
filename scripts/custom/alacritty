@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# file is sourced from build-packages.sh
+# there is no need to source strict-mode, utils, or asdf
+
+#==== Start of custom build steps ====
+ORIG_PATH="$(pwd)"
+cd "${EXTRACTED_FILE}/${NAME}-${VERSION}/${NAME}" || exit 1
+
+cargo deb
+cargo rpm init
+cargo rpm build
+cd .. || exit 1
+mv "./target/release/rpmbuild/RPMS/$(uname -m)/${RPM_FILE_NAME}" "${RPM_FINAL_DIR}"
+mv "./target/debian/${DEB_FILE_NAME}" "${DEB_FINAL_DIR}"
+
+cd  "${ORIG_PATH}" || exit 1
+#===== End of custom build steps =====

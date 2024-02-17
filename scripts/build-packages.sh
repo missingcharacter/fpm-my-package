@@ -14,6 +14,8 @@ strictMode
 
 THIS_SCRIPT=$(basename "${0}")
 PADDING=$(printf %-${#THIS_SCRIPT}s " ")
+RPM_FINAL_DIR='/data/tmp-files/RPM/'
+DEB_FINAL_DIR='/data/tmp-files/DEB/'
 declare -a DEPENDENCIES=(
   'file'
   'fpm'
@@ -74,6 +76,7 @@ MAINTAINER="$(yq e ".packages[${PACKAGE_INDEX}].maintainer" "${PACKAGES_YAML}")"
 LICENSE="$(yq e ".packages[${PACKAGE_INDEX}].license" "${PACKAGES_YAML}")"
 DESCRIPTION="$(yq e ".packages[${PACKAGE_INDEX}].description" "${PACKAGES_YAML}")"
 NOARCH="$(yq e ".packages[${PACKAGE_INDEX}].noarch" "${PACKAGES_YAML}")"
+NO_FPM="$(yq e ".packages[${PACKAGE_INDEX}].no_fpm" "${PACKAGES_YAML}")"
 DEB_ARCH="$(get_arch)"
 ARCHITECTURE='native'
 RPM_FILE_NAME="${NAME}-${VERSION}-${RELEASE}.$(uname -m).rpm"
@@ -113,14 +116,19 @@ while IFS= read -r flag; do
   fi
 done < <(yq e ".packages[${PACKAGE_INDEX}].deb_flags[]" "${PACKAGES_YAML}")
 
+# shellcheck disable=SC2034
 EXTRACTED_FILE="$(extract_file "${SOURCE_FILE}" "${NAME}" "${VERSION}")"
-export EXTRACTED_FILE
 
 CUSTOM_SCRIPT="/data/scripts/custom/${NAME}"
 
 if [[ -f "${CUSTOM_SCRIPT}" ]]; then
   # shellcheck source=/dev/null
-  . "${CUSTOM_SCRIPT}" "${VERSION}" "${EXTRACTED_FILE}"
+  . "${CUSTOM_SCRIPT}"
+fi
+
+if [[ "${NO_FPM}" == 'true' ]]; then
+  msg_info "Skipping fpm packaging"
+  exit 0
 fi
 
 # `eval` is used to expand the variables in the flags
@@ -150,9 +158,9 @@ msg_info "fpm options for RPM are:" "${RPM_OPTS[@]}"
 
 rpm -qpi "${RPM_FILE_NAME}"
 
-msg_info "Moving RPM to /data/tmp-files/RPM/"
+msg_info "Moving RPM to ${RPM_FINAL_DIR}"
 
-mv "${RPM_FILE_NAME}" /data/tmp-files/RPM/
+mv "${RPM_FILE_NAME}" "${RPM_FINAL_DIR}"
 
 msg_info "Creating DEB"
 
@@ -162,6 +170,6 @@ msg_info "fpm options for DEB are:" "${DEB_OPTS[@]}"
 
 dpkg-deb -I "${DEB_FILE_NAME}"
 
-msg_info "Moving DEB to /data/tmp-files/DEB/"
+msg_info "Moving DEB to ${DEB_FINAL_DIR}"
 
-mv "${DEB_FILE_NAME}" /data/tmp-files/DEB/
+mv "${DEB_FILE_NAME}" "${DEB_FINAL_DIR}"

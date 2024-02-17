@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 # file is sourced from build-packages.sh
 # there is no need to source strict-mode, utils, or asdf
-VERSION="${1}"
-SRC_DIR="${2}"
 
 #==== Start of custom build steps ====
 ORIG_PATH="$(pwd)"
-cd "${SRC_DIR}/PathPicker-${VERSION}/debian/" || exit 1
+cd "${EXTRACTED_FILE}/PathPicker-${VERSION}/debian/" || exit 1
 # OVERRIDE='cd /data/fpp/PathPicker-0.9.2/debian/ && ./package.sh && mv ../fpp_*_noarch.deb /data/tmp-files/DEB/'
 
 PTH="$(pwd)"
