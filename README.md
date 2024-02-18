@@ -37,6 +37,9 @@ packages:
     deb_flags: <Optional, list of deb specific fpm flags>
     rpm_flags: <Optional, list of rpm specific fpm flags>
     files_flags: <List of file searching fpm flags>
+    no_fpm: |
+      <Optional boolean, when `true` custom script builds rpm/deb and moves
+      them>
 ```
 
 ## Where will packages appear?
