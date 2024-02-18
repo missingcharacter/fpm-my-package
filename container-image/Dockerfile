@@ -65,6 +65,7 @@ RUN --mount=type=bind,source=post-asdf.sh,target=${ASDF_POST} \
         patch \
         pkg-config \
         rpm \
+        scdoc \
         software-properties-common \
         tar \
         tk-dev \

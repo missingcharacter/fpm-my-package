@@ -6,12 +6,59 @@
 ORIG_PATH="$(pwd)"
 cd "${EXTRACTED_FILE}/${NAME}-${VERSION}/${NAME}" || exit 1
 
+msg_info "Building Alacritty man pages and terminfo files"
+
+mkdir output
+scdoc < extra/man/alacritty.1.scd | gzip -c > "./output/alacritty.1.gz"
+scdoc < extra/man/alacritty-msg.1.scd | gzip -c > "./output/alacritty-msg.1.gz"
+scdoc < extra/man/alacritty.5.scd | gzip -c > "./output/alacritty.5.gz"
+scdoc < extra/man/alacritty-bindings.5.scd | gzip -c > "./output/alacritty-bindings.5.gz"
+
+tic -xe alacritty,alacritty-direct -o output/ extra/alacritty.info
+
+msg_info "Building Alacritty deb and rpm packages"
+cat <<'EOF' >> Cargo.toml
+
+[package.metadata.deb]
+assets = [
+    ["target/release/alacritty", "usr/local/bin/", "755"],
+    ["extra/logo/alacritty-term.svg", "usr/share/pixmaps/Alacritty.svg", "644"],
+    ["extra/linux/Alacritty.desktop", "usr/share/applications/org.alacritty.Alacritty.desktop", "644"],
+    ["extra/completions/alacritty.bash", "usr/share/bash-completion/completions/alacritty", "644"],
+    ["extra/completions/alacritty.fish", "usr/share/fish/completions/", "644"],
+    ["extra/completions/_alacritty", "usr/share/vendor-completions/", "644"],
+    ["output/alacritty.1.gz", "usr/local/share/man/man1/", "644"],
+    ["output/alacritty-msg.1.gz", "usr/local/share/man/man1/", "644"],
+    ["output/alacritty.5.gz", "usr/local/share/man/man5/", "644"],
+    ["output/alacritty-bindings.5.gz", "usr/local/share/man/man5/", "644"],
+    ["output/a/alacritty", "usr/share/terminfo/a/", "644"],
+    ["output/a/alacritty-direct", "usr/share/terminfo/a/", "644"],
+]
+
+[package.metadata.generate-rpm]
+assets = [
+    {source = "../target/release/alacritty", dest = "/usr/local/bin/alacritty", mode = "755"},
+    {source = "extra/logo/alacritty-term.svg", dest = "/usr/share/pixmaps/Alacritty.svg", mode = "644"},
+    {source = "extra/linux/Alacritty.desktop", dest = "/usr/share/applications/org.alacritty.Alacritty.desktop", mode = "644"},
+    {source = "extra/completions/alacritty.bash", dest = "/usr/share/bash-completion/completions/alacritty", mode = "644"},
+    {source = "extra/completions/alacritty.fish", dest = "/usr/share/fish/completions/alacritty.fish", mode = "644"},
+    {source = "extra/completions/_alacritty", dest = "/usr/share/vendor-completions/_alacritty", mode = "644"},
+    {source = "output/alacritty.1.gz", dest = "/usr/local/share/man/man1/alacritty.1.gz", mode = "644"},
+    {source = "output/alacritty-msg.1.gz", dest = "/usr/local/share/man/man1/alacritty-msg.1.gz", mode = "644"},
+    {source = "output/alacritty.5.gz", dest = "/usr/local/share/man/man5/alacritty.5.gz", mode = "644"},
+    {source = "output/alacritty-bindings.5.gz", dest = "/usr/local/share/man/man5/alacritty-bindings.5.gz", mode = "644"},
+    {source = "output/a/alacritty", dest = "/usr/share/terminfo/a/alacritty", mode = "644"},
+    {source = "output/a/alacritty-direct", dest = "/usr/share/terminfo/a/alacritty-direct", mode = "644"},
+]
+EOF
+
+cargo build --release
+strip -s ../target/release/alacritty
 cargo deb
-cargo rpm init
-cargo rpm build
-cd .. || exit 1
-mv "./target/release/rpmbuild/RPMS/$(uname -m)/${RPM_FILE_NAME}" "${RPM_FINAL_DIR}"
-mv "./target/debian/${DEB_FILE_NAME}" "${DEB_FINAL_DIR}"
+cargo generate-rpm
+
+mv "./target/generate-rpm/${RPM_FILE_NAME}" "${RPM_FINAL_DIR}"
+mv "../target/debian/${DEB_FILE_NAME}" "${DEB_FINAL_DIR}"
 
 cd  "${ORIG_PATH}" || exit 1
 #===== End of custom build steps =====

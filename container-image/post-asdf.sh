@@ -100,7 +100,7 @@ gem update
 
 echo "Installing cargo deb and rpm"
 cargo install cargo-deb
-cargo install cargo-rpm
+cargo install cargo-generate-rpm
 
 echo "reshim all plugins"
 asdf reshim
