@@ -10,6 +10,8 @@ declare -a REQUIRED_FIELDS=(
   'version'
   'release'
   'source'
+)
+declare -a REQUIRED_FPM_FIELDS=(
   'vendor'
   'license'
   'description'
@@ -60,7 +62,7 @@ function download_and_build () {
   local fpm_tag="${3}"
   local name version release source vendor maintainer license description \
       downloaded_file container_downloaded_file host_downloaded_file \
-      container_packages_yaml fpm_opts
+      container_packages_yaml no_fpm fpm_opts
   name="$(yq e ".packages[${index}].name" "${packages_yaml}")"
   version="$(yq e ".packages[${index}].version" "${packages_yaml}")"
   release="$(yq e ".packages[${index}].release" "${packages_yaml}")"
@@ -74,7 +76,13 @@ function download_and_build () {
   container_downloaded_file="/data/tmp-files/downloads/${downloaded_file}"
   container_packages_yaml="/tmp/packages.yaml"
 
-  for field in "${REQUIRED_FIELDS[@]}"; do
+  declare -a required_fields=( "${REQUIRED_FIELDS[@]}" "${REQUIRED_FPM_FIELDS[@]}")
+  no_fpm="$(yq e ".packages[${index}].no_fpm" "${packages_yaml}")"
+  if [[ "${no_fpm}" == 'true' ]]; then
+    required_fields=( "${REQUIRED_FIELDS[@]}" )
+  fi
+
+  for field in "${required_fields[@]}"; do
     if [[ "$(yq e ".packages[${index}].${field}" "${packages_yaml}")" == 'null' ]]; then
       msg_fatal "[-] Package configuration for ${name} is missing the ${field} field. See this project's README for more details"
     fi

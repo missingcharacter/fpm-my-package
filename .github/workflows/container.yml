@@ -1,13 +1,29 @@
 ---
-name: Build and publish container image
+name: Create and publish container image
 on:
+  workflow_dispatch:
   push:
-    tags:
-      - v*
+    branches:
+      - main
+      - develop
+    paths:
+      - container-image/**
+  pull_request:
+    types:
+      # build when the PR is created, reopened, or new commits are added to the PR
+      #- opened
+      #- reopened
+      #- edited
+      # you can also remove the above types, and just use ready_for_review
+      # to cut down on the number of builds if you use a review workflow
+      - ready_for_review
+    paths:
+      - container-image/**
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 permissions:
+  # this job needs to be able to push to ghcr
   contents: read
   packages: write
 jobs:
@@ -30,7 +46,24 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
+          # NOTE: you can add more registries here if needed
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # ci.$branch.$buildNumber.$hash
+          # ci.pr-$prNumber.$buildNumber.$hash
+          # NOTE: the build number is global for all builds in this repository
+          tags: |
+            type=ref,event=branch,prefix=ci.,suffix=.${{ github.run_number }}.{{sha}}
+            type=ref,event=pr,prefix=ci.pr-,suffix=.${{ github.run_number }}.{{sha}}
+      # - name: Set up cache
+      #   uses: actions/cache@v4
+      #   with:
+      #     path: build-cache
+      #     # don't use hashfiles() for cache names, npm/apt/pypi are smart enough
+      #     key: ${{ github.repository }}-${{ runner.os }}-build-cache
+      # - name: inject build cache into docker
+      #   uses: reproducible-containers/buildkit-cache-dance@v2
+      #   with:
+      #     cache-source: build-cache
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -39,3 +72,13 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: add job annotation
+        shell: bash
+        run: |
+          echo -e '::notice title=Build complete!::Image tags:\n ${{ steps.meta.outputs.tags }}'
+      - name: add job summary
+        shell: bash
+        run: |-
+          echo -e "## Build successful! :rocket:\n### Images\n\n\`\`\`\n${{ steps.meta.outputs.tags }}\n\`\`\`" >> "${GITHUB_STEP_SUMMARY}"
