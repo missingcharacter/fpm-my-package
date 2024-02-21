@@ -6,14 +6,14 @@ on:
     - cron: '0 0 1 * *'  # the first day of the month
 jobs:
   clean-ghcr-develop:
-    name: Delete old unused container images
+    name: Delete old unused develop container images
     runs-on: ubuntu-latest
     steps:
       - name: Delete old pr and develop images
         uses: snok/container-retention-policy@v2
         with:
           image-names: fpm-my-package
-          filter-tags: '"ci.pr*", "ci.develop*"'
+          filter-tags: ci.pr*, ci.develop*
           cut-off: One hour ago UTC
           timestamp-to-use: created_at
           keep-at-least: 0
@@ -21,7 +21,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           token-type: github-token
   clean-ghcr-main:
-    name: Delete old unused container images
+    name: Delete old unused main container images
     runs-on: ubuntu-latest
     steps:
       - name: Delete old main images
