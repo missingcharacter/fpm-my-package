@@ -54,6 +54,7 @@ function get_arch() {
 }
 
 function get_tag() {
+  # https://gist.github.com/eggplants/a046346571de66656f4d4d34de69fdd0
   local user_image="${1}"
   local token
   token="$(
