@@ -12,6 +12,7 @@ Note: Quick and dirty script
 - [parallel](https://www.gnu.org/software/parallel/)
   - MacOS: `parallel` can be installed via `brew`
 - [yq](https://github.com/mikefarah/yq)
+- [jq](https://stedolan.github.io/jq/)
 
 ## Run it like this
 

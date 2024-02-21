@@ -19,7 +19,9 @@ export -f strictMode
 export -f strictModeFail
 
 # Make these variables available to 'parallel'
-export FPM_TAG='ghcr.io/missingcharacter/fpm-my-package:0.0.3'
+USER_IMAGE='missingcharacter/fpm-my-package'
+TAG="$(get_tag "${USER_IMAGE}")"
+export FPM_TAG="ghcr.io/${USER_IMAGE}:${TAG}"
 export PACKAGES_YAML="${GITROOT}/packages.yaml"
 NUMBER_OF_PACKAGES=$(yq e '.packages | length' "${PACKAGES_YAML}")
 declare -a DEPENDENCIES=(

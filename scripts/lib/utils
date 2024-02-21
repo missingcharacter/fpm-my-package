@@ -53,6 +53,18 @@ function get_arch() {
   esac
 }
 
+function get_tag() {
+  local user_image="${1}"
+  local token
+  token="$(
+    curl "https://ghcr.io/token?scope=repository:${user_image}:pull" |
+    awk -F'"' '$0=$4'
+  )"
+  curl -H "Authorization: Bearer ${token}" \
+    "https://ghcr.io/v2/${user_image}/tags/list" |
+    jq -r '[.tags[] | select(startswith("ci.main"))] | sort | reverse | first'
+}
+
 function download_and_build () {
   # Enable bash's unofficial strict mode
   strictMode
