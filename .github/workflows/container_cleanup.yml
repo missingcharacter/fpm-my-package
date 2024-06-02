@@ -2,8 +2,8 @@
 name: Delete old container images
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 0 1 * *'  # the first day of the month
+  # schedule:
+  #   - cron: '0 0 1 * *'  # the first day of the month
 jobs:
   clean-ghcr-develop:
     name: Delete old unused develop container images
