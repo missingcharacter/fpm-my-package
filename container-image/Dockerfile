@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM ubuntu:noble-20250127
+FROM ubuntu:noble-20250529
 
 ENV ASDF_DIR=/root/.asdf
 ENV ASDF_POST=/root/post-asdf.sh
