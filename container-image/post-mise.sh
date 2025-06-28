@@ -37,7 +37,7 @@ function confirm_install() {
   local version="${2}"
   echo "Checking ${runtime} ${version}..."
   case "${runtime}" in
-    "golang")
+    "go")
       if grep -q "${version}" <(go version); then
         return 0
       fi
@@ -67,14 +67,15 @@ function confirm_install() {
 
 while IFS= read -r runtimeVersion; do
   if [[ -n ${runtimeVersion} ]]; then
-    runtime="$(cut -d ' ' -f1 <<<"${runtimeVersion}")"
-    version="$(cut -d ' ' -f2 <<<"${runtimeVersion}")"
+    runtime="$(cut -d '=' -f1 <<<"${runtimeVersion}" | xargs)"
+    version="$(cut -d '=' -f2 <<<"${runtimeVersion}" | tr -d '"' | xargs)"
+    mise use -g "${runtime}@${version}"
     if ! confirm_install "${runtime}" "${version}"; then
       echo "${runtime} with version ${version} is not installed"
       exit 1
     fi
   fi
-done <"${HOME}/.tool-versions"
+done < <(grep -v tools /root/.config/mise/config.toml)
 
 OS="$(get_os)"
 ARCH="$(get_arch)"
@@ -103,4 +104,4 @@ cargo install cargo-deb
 cargo install cargo-generate-rpm
 
 echo "reshim all plugins"
-asdf reshim
+mise reshim

@@ -7,10 +7,6 @@ export GITROOT
 strictMode
 # shellcheck source=./scripts/build-packages.sh
 . "${GITROOT}/scripts/lib/utils"
-# We source asdf to ensure that the correct version of fpm is used
-# Also, this script should only be run inside the container
-# shellcheck source=/dev/null
-. "${HOME}/.asdf/asdf.sh"
 
 THIS_SCRIPT=$(basename "${0}")
 PADDING=$(printf %-${#THIS_SCRIPT}s " ")
