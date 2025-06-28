@@ -1,8 +1,7 @@
 # syntax=docker/dockerfile:1
 FROM ubuntu:noble-20250529
 
-ENV ASDF_DIR=/root/.asdf
-ENV ASDF_POST=/root/post-asdf.sh
+ENV MISE_POST=/root/post-mise.sh
 ENV DEBIAN_FRONTEND=noninteractive
 ENV FPM_VERSION=1.15.1
 ENV GUM_DEB=/tmp/gum.deb
@@ -11,14 +10,19 @@ ENV LC_ALL=C.UTF-8
 ENV LANG=C.UTF-8
 ENV TERM=linux
 ENV YQ_VERSION=4.40.5
+ENV MISE_DATA_DIR="/mise"
+ENV MISE_CONFIG_DIR="/mise"
+ENV MISE_CACHE_DIR="/mise/cache"
+ENV MISE_INSTALL_PATH="/usr/local/bin/mise"
+ENV PATH="/mise/shims:$PATH"
 
 COPY 01_nodoc /etc/dpkg/dpkg.conf.d/01_nodoc
 COPY 01_norecommend /etc/apt/apt.conf.d/01_norecommend
-COPY asdfrc /root/.asdfrc
-COPY tool-versions /root/.tool-versions
+COPY mise-config.toml /root/.config/mise/config.toml
 
 # Install FPM.
-RUN --mount=type=bind,source=post-asdf.sh,target=${ASDF_POST} \
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+RUN --mount=type=bind,source=post-mise.sh,target=${MISE_POST} \
     apt update && \
     apt -y dist-upgrade && \
     echo '===> Installing packages...' && \
@@ -75,20 +79,14 @@ RUN --mount=type=bind,source=post-asdf.sh,target=${ASDF_POST} \
         xsltproc \
         xz-utils \
         zlib1g-dev && \
-    echo '===> Installing asdf...' && \
-    git clone https://github.com/asdf-vm/asdf.git "${ASDF_DIR}" && \
-    printf '\n. "${HOME}/.asdf/asdf.sh"\n' >> ~/.bashrc && \
-    . "${HOME}/.asdf/asdf.sh" && \
-    asdf update && \
-    echo '===> Installing asdf plugins...' && \
-    awk '{ print $1 }' "${HOME}/.tool-versions" | xargs -L1 asdf plugin add && \
-    echo '===> Installing asdf runtimes...' && \
-    asdf install && \
-    echo '===> Running post-asdf.sh...' && \
-    bash "${ASDF_POST}" && \
+    echo '===> Installing mise...' && \
+    curl https://mise.run | sh && \
+    mise version && \
+    echo "===> Running ${MISE_POST}..." && \
+    bash "${MISE_POST}" && \
     echo '===> Installing charmbracelet/gum...' && \
-    apt install -y /tmp/gum.deb && \
-    echo "===> Installing yq version ${YQ_VERSION}..." && \
+    apt install -y "${GUM_DEB}" && \
+    echo "===> Making yq ${YQ_VERSION} executable..." && \
     chmod +x /usr/bin/yq && \
     echo "===> Installing fpm version ${FPM_VERSION}..." && \
     gem install fpm -v "${FPM_VERSION}" && \

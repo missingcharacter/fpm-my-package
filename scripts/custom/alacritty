@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # file is sourced from build-packages.sh
-# there is no need to source strict-mode, utils, or asdf
+# there is no need to source strict-mode or utils
 
 #==== Start of custom build steps ====
 ORIG_PATH="$(pwd)"
