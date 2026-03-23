@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM ubuntu:noble-20250529
+FROM ubuntu:noble-20260217
 
 ENV MISE_POST=/root/post-mise.sh
 ENV DEBIAN_FRONTEND=noninteractive
